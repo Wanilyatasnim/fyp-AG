@@ -1,0 +1,9 @@
+﻿venv/
+.env
+__pycache__/
+*.pkl
+*.sqlite3
+*.docx
+extracted_doc.txt
+TodoList_TB_PTLD.txt
+TodoList_TB_PTLD_utf8.txt

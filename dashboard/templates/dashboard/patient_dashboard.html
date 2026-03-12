@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Dashboard — {{ patient.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .risk-badge-low {
+    background: var(--color-risk-low);
+    color: #fff;
+  }
+
+  .risk-badge-moderate {
+    background: var(--color-risk-moderate);
+    color: #fff;
+  }
+
+  .risk-badge-high {
+    background: var(--color-risk-high);
+    color: #fff;
+  }
+
+  .gauge-wrap {
+    position: relative;
+    width: 220px;
+    margin: auto;
+  }
+
+  .gauge-center-text {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .shap-bar-pos {
+    background: #C62828;
+    height: 18px;
+    border-radius: 3px;
+  }
+
+  .shap-bar-neg {
+    background: #2E7D32;
+    height: 18px;
+    border-radius: 3px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% load static %}
+
+{# ── Identity Card ── #}
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h4 class="mb-1">{{ patient.name }}</h4>
+          <small class="text-muted">ID: {{ patient.patient_id }}</small><br>
+          <small class="text-muted">Age: {{ patient.Age|default:"—" }} &nbsp;|&nbsp; Sex: {{
+            patient.get_Sex_display|default:"—" }}</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          {% if prediction %}
+          <span class="badge fs-6 risk-badge-{{ prediction.risk_category|lower }}">
+            {{ prediction.risk_category }} Risk &nbsp; {{ prediction.risk_score|floatformat:2 }}
+          </span>
+          {% else %}
+          <span class="badge bg-secondary fs-6">No Prediction Yet</span>
+          {% endif %}
+          <form method="post" action="{% url 'generate_prediction' patient.patient_id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-primary" title="Run ML prediction now">
+              <i class="bi bi-cpu-fill me-1"></i>Generate Prediction
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+
+  {# ── Semi-circle Risk Gauge ── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-bold">Risk Score</div>
+      <div class="card-body text-center">
+        <div class="gauge-wrap">
+          <canvas id="riskGauge" width="220" height="130"></canvas>
+          <div class="gauge-center-text">
+            <span class="fs-4 fw-bold" id="gaugeLabel">
+              {% if prediction %}{{ prediction.risk_score|floatformat:0 }}%{% else %}—{% endif %}
+            </span><br>
+            <small class="text-muted">Risk Score</small>
+          </div>
+        </div>
+        {% if prediction %}
+        <p class="mt-2 mb-0">
+          Model: <code>{{ prediction.model_used }}</code><br>
+          <small class="text-muted">{{ prediction.prediction_date|date:"Y-m-d H:i" }}</small>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── 6-month Bacilloscopy Chart ── #}
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header fw-bold">6-Month Serial Bacilloscopy</div>
+      <div class="card-body">
+        <canvas id="bacilloChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# ── SHAP Risk Explanation ── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-bold">Risk Factor Contributions (SHAP)</div>
+      <div class="card-body">
+        {% if prediction and prediction.shap_values %}
+        <ul class="list-group list-group-flush" id="shapList"></ul>
+        {% else %}
+        <p class="text-muted">No SHAP explanation available yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Recommendations ── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-bold">Clinical Recommendations</div>
+      <div class="card-body">
+        {% if prediction %}
+        {% if prediction.risk_category == "High" %}
+        <ol>
+          <li>Immediately review drug susceptibility results and consider MDR-TB protocol.</li>
+          <li>Increase monitoring visits to fortnightly until Month 6.</li>
+          <li>Consult infectious disease specialist.</li>
+          <li>Reassess comorbidity management (HIV, diabetes, etc.).</li>
+        </ol>
+        {% elif prediction.risk_category == "Moderate" %}
+        <ol>
+          <li>Monitor monthly as scheduled; do not miss visits.</li>
+          <li>Review bacilloscopy results at Month 3 if still positive.</li>
+          <li>Assess supervised treatment adherence.</li>
+        </ol>
+        {% else %}
+        <ol>
+          <li>Continue standard treatment protocol.</li>
+          <li>Encourage adherence and complete the 6-month course.</li>
+          <li>Routine follow-up at scheduled intervals.</li>
+        </ol>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">Recommendations available once at least 2 monitoring visits and 3 months of treatment are
+          recorded.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  // ── Risk Gauge (Doughnut clipped to semi-circle) ──
+  const riskScore = {{ prediction.risk_score|default: 0 | floatformat: 4 }};
+  const gaugeCtx = document.getElementById('riskGauge').getContext('2d');
+  new Chart(gaugeCtx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [riskScore * 100, 100 - riskScore * 100],
+        backgroundColor: [
+          riskScore > 0.67 ? '#C62828' : riskScore > 0.33 ? '#F9A825' : '#2E7D32',
+          '#e9ecef'
+        ],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      rotation: -90,
+      circumference: 180,
+      cutout: '75%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { animateRotate: true, duration: 1000 }
+    }
+  });
+
+  // ── Bacilloscopy Line Chart ──
+  const visits = [
+    {% for v in patient.visits.all %}
+  { month: { { v.visit_month } }, result: { { v.bacilloscopy_result |default: "null" } } },
+  {% endfor %}
+];
+  const monthLabels = ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6'];
+  const resultMap = {};
+  visits.forEach(v => { if (v.result !== null) resultMap[v.month] = v.result; });
+  const chartData = monthLabels.map((_, i) => resultMap[i + 1] !== undefined ? resultMap[i + 1] : null);
+
+  // Plugin: red/yellow shaded overlay for risk months
+  const riskOverlayPlugin = {
+    id: 'riskOverlay',
+    beforeDraw(chart) {
+      const { ctx, chartArea: { left, right, top, bottom }, scales: { x } } = chart;
+      if (!x) return;
+      const slotW = (right - left) / 6;
+
+      // Yellow zone: Month 3–4 (index 2-3)
+      ctx.save();
+      ctx.fillStyle = 'rgba(249,168,37,0.18)';
+      ctx.fillRect(left + slotW * 2, top, slotW * 2, bottom - top);
+
+      // Red zone: Month 5–6 (index 4-5)
+      ctx.fillStyle = 'rgba(198,40,40,0.13)';
+      ctx.fillRect(left + slotW * 4, top, slotW * 2, bottom - top);
+      ctx.restore();
+    }
+  };
+
+  const bacilloCtx = document.getElementById('bacilloChart').getContext('2d');
+  new Chart(bacilloCtx, {
+    type: 'line',
+    plugins: [riskOverlayPlugin],
+    data: {
+      labels: monthLabels,
+      datasets: [{
+        label: 'Bacilloscopy (1=+ve, 2=-ve)',
+        data: chartData,
+        borderColor: '#1565C0',
+        backgroundColor: 'rgba(21,101,192,0.1)',
+        tension: 0.3,
+        fill: true,
+        spanGaps: true
+      }]
+    },
+    options: {
+      scales: {
+        y: { min: 0, max: 4, ticks: { stepSize: 1 } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterBody: () => ['\n🟡 Yellow = moderate risk period (M3-4)', '🔴 Red = high risk period (M5-6)']
+          }
+        }
+      }
+    }
+  });
+
+  // ── SHAP Explanation List ──
+  const shapData = {{ shap_data_json| safe }};
+  const shapList = document.getElementById('shapList');
+  if (shapList && shapData) {
+    const sorted = Object.entries(shapData).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    sorted.forEach(([feat, val]) => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item px-0 py-2';
+      const barWidth = Math.min(Math.abs(val) * 200, 100).toFixed(1);
+      const direction = val >= 0 ? 'increases' : 'decreases';
+      const barClass = val >= 0 ? 'shap-bar-pos' : 'shap-bar-neg';
+      li.innerHTML = `<div class="d-flex justify-content-between mb-1">
+      <span>${feat.replace(/_/g, ' ')}</span>
+      <small class="text-muted">${direction} risk (${val.toFixed(3)})</small>
+    </div>
+    <div class="${barClass}" style="width:${barWidth}%"></div>`;
+      shapList.appendChild(li);
+    });
+  }
+</script>
+{% endblock %}

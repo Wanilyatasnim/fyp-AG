@@ -1,0 +1,31 @@
+:root {
+    /* Design Tokens from UI Design Doc */
+    --color-risk-low: #2E7D32;
+    --color-risk-moderate: #F9A825;
+    --color-risk-high: #C62828;
+}
+
+.badge-risk-low {
+    background-color: var(--color-risk-low);
+    color: white;
+}
+
+.badge-risk-moderate {
+    background-color: var(--color-risk-moderate);
+    color: white;
+}
+
+.badge-risk-high {
+    background-color: var(--color-risk-high);
+    color: white;
+}
+
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: none;
+    margin-bottom: 20px;
+}

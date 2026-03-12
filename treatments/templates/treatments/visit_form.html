@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Monitoring Visit for {{ patient.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Record Monitoring Visit - {{ patient.name }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Save Visit</button>
+        <a href="{% url 'patient_detail' patient.patient_id %}" class="btn btn-secondary">Cancel</a>
+    </form>
+
+    <hr>
+    <h4>Previous Visits</h4>
+    {% if visits %}
+    <ul class="list-group">
+        {% for visit in visits %}
+        <li class="list-group-item">
+            <strong>Month {{ visit.visit_month }}</strong> | Date: {{ visit.visit_date|default:"-" }} | Result: {{
+            visit.get_bacilloscopy_result_display|default:"-" }}
+            <br>Notes: {{ visit.clinical_notes|default:"-" }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No visits recorded yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

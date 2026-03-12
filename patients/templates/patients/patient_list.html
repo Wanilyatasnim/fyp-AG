@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Patient Management</h2>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'patient_create' %}" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill"></i> Add Patient
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="mb-4">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Search by name..." value="{{ request.GET.q }}">
+                <button class="btn btn-outline-secondary" type="submit">Search</button>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Patient ID</th>
+                        <th>Age</th>
+                        <th>Date Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient in patients %}
+                    <tr>
+                        <td>{{ patient.name }}</td>
+                        <td>{{ patient.patient_id|stringformat:"s"|slice:":8" }}...</td>
+                        <td>{{ patient.Age|default:"Unknown" }}</td>
+                        <td>{{ patient.created_at|date:"Y-m-d" }}</td>
+                        <td>
+                            <a href="{% url 'patient_detail' patient.patient_id %}" class="btn btn-sm btn-info text-white">View</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No patients found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

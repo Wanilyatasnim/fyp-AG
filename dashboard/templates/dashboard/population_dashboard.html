@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Population Dashboard — TB-PTLD{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stat-card { border-left: 5px solid; }
+  .stat-card.patients { border-color: #1565C0; }
+  .stat-card.avg-risk  { border-color: #F9A825; }
+  .stat-card.high-risk { border-color: #C62828; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col"><h2 class="mb-0">Population Dashboard</h2></div>
+</div>
+
+{# ── 3 Stat Cards ── #}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card stat-card patients p-3">
+      <div class="text-muted small">Active Patients Monitored</div>
+      <div class="fs-2 fw-bold text-primary">{{ total_patients }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card avg-risk p-3">
+      <div class="text-muted small">Avg. Risk Score</div>
+      <div class="fs-2 fw-bold" style="color:#F9A825">{{ avg_risk_score|floatformat:2|default:"—" }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card high-risk p-3">
+      <div class="text-muted small">High-Risk Patients</div>
+      <div class="fs-2 fw-bold text-danger">{{ high_risk_count|default:"—" }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Monthly Risk Trends Chart ── #}
+<div class="card mb-4">
+  <div class="card-header fw-bold">Monthly Risk Trends</div>
+  <div class="card-body">
+    <canvas id="riskTrendChart" height="80"></canvas>
+  </div>
+</div>
+
+{# ── Patient List Summary Table ── #}
+<div class="card">
+  <div class="card-header fw-bold">Patient Summary</div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Age</th>
+          <th>Latest Risk</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in patients %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.age|default:"—" }}</td>
+          <td>
+            {% with p.predictions.all.0 as pred %}
+              {% if pred %}
+                <span class="badge
+                  {% if pred.risk_category == 'High' %}bg-danger
+                  {% elif pred.risk_category == 'Moderate' %}bg-warning text-dark
+                  {% else %}bg-success{% endif %}">
+                  {{ pred.risk_category }}
+                </span>
+              {% else %}
+                <span class="badge bg-secondary">No Data</span>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td><a href="{% url 'patient_dashboard' p.patient_id %}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center py-3 text-muted">No patients found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// Monthly Risk Trends — placeholder data until real queries are added
+const ctx = document.getElementById('riskTrendChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+    datasets: [
+      { label:'Low Risk %',      data:[70,68,72,65,60,58], borderColor:'#2E7D32', backgroundColor:'rgba(46,125,50,0.1)', fill:true, tension:0.3 },
+      { label:'Moderate Risk %', data:[20,22,18,25,28,30], borderColor:'#F9A825', backgroundColor:'rgba(249,168,37,0.1)', fill:true, tension:0.3 },
+      { label:'High Risk %',     data:[10,10,10,10,12,12], borderColor:'#C62828', backgroundColor:'rgba(198,40,40,0.1)', fill:true, tension:0.3 }
+    ]
+  },
+  options: {
+    scales: { y: { min:0, max:100, ticks:{ callback:v=>v+'%' } } },
+    plugins: { legend: { position:'bottom' } }
+  }
+});
+</script>
+{% endblock %}
