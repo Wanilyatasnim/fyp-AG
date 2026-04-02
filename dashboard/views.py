@@ -1,5 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
+
+def is_clinician_or_admin(user):
+    return user.is_authenticated and user.role in ['ADMIN', 'CLINICIAN']
 from django.contrib import messages
 from django.db.models import Avg
 from patients.models import Patient
@@ -45,6 +48,7 @@ def patient_dashboard(request, patient_id):
 
 
 @login_required
+@user_passes_test(is_clinician_or_admin)
 def generate_prediction(request, patient_id):
     """
     Manual trigger for clinician: run prediction and save to DB.
@@ -60,7 +64,7 @@ def generate_prediction(request, patient_id):
         risk_score, risk_category, model_used, shap_values = predict_ptld_risk(patient)
 
         Prediction.objects.create(
-            patient=patient,
+            patient_id=patient,
             risk_score=risk_score,
             risk_category=risk_category,
             model_used=model_used,

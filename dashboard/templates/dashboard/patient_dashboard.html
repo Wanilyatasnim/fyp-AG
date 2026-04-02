@@ -68,12 +68,17 @@
           {% else %}
           <span class="badge bg-secondary fs-6">No Prediction Yet</span>
           {% endif %}
+          {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
+          <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-calendar-plus"></i> Add Visit
+          </a>
           <form method="post" action="{% url 'generate_prediction' patient.patient_id %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm btn-outline-primary" title="Run ML prediction now">
               <i class="bi bi-cpu-fill me-1"></i>Generate Prediction
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
     </div>

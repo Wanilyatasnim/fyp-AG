@@ -17,10 +17,15 @@
     {% if visits %}
     <ul class="list-group">
         {% for visit in visits %}
-        <li class="list-group-item">
-            <strong>Month {{ visit.visit_month }}</strong> | Date: {{ visit.visit_date|default:"-" }} | Result: {{
-            visit.get_bacilloscopy_result_display|default:"-" }}
-            <br>Notes: {{ visit.clinical_notes|default:"-" }}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Month {{ visit.visit_month }}</strong> | Date: {{ visit.visit_date|default:"-" }} | Result: {{ visit.get_bacilloscopy_result_display|default:"-" }}
+                <br>Notes: {{ visit.clinical_notes|default:"-" }}
+            </div>
+            <div>
+                <a href="{% url 'monitoring_visit_update' visit.id %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i> Edit</a>
+                <a href="{% url 'monitoring_visit_delete' visit.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</a>
+            </div>
         </li>
         {% endfor %}
     </ul>

@@ -6,9 +6,11 @@
         <h2>Patient Management</h2>
     </div>
     <div class="col text-end">
+        {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
         <a href="{% url 'patient_create' %}" class="btn btn-primary">
             <i class="bi bi-person-plus-fill"></i> Add Patient
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -33,14 +35,18 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for patient in patients %}
+                    {% for patient in page_obj %}
                     <tr>
                         <td>{{ patient.name }}</td>
                         <td>{{ patient.patient_id|stringformat:"s"|slice:":8" }}...</td>
                         <td>{{ patient.Age|default:"Unknown" }}</td>
                         <td>{{ patient.created_at|date:"Y-m-d" }}</td>
                         <td>
-                            <a href="{% url 'patient_detail' patient.patient_id %}" class="btn btn-sm btn-info text-white">View</a>
+                            <a href="{% url 'patient_detail' patient.patient_id %}" class="btn btn-sm btn-info text-white"><i class="bi bi-eye"></i> View</a>
+                            {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
+                            <a href="{% url 'patient_update' patient.patient_id %}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Edit</a>
+                            <a href="{% url 'patient_delete' patient.patient_id %}" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Delete</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -51,6 +57,41 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Patient pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if query %}&q={{ query }}{% endif %}">&laquo; First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                {% endif %}
+
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}">Last &raquo;</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+                <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

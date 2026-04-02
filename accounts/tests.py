@@ -35,3 +35,32 @@ class LoginTests(TestCase):
         resp = self.client.get('/patients/')
         self.assertEqual(resp.status_code, 302)
         self.assertIn('/auth/login/', resp['Location'])
+
+
+class RBACTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user(username='admin', password='pass', role='ADMIN')
+        self.clinician = User.objects.create_user(username='clinician', password='pass', role='CLINICIAN')
+        self.analyst = User.objects.create_user(username='analyst', password='pass', role='ANALYST')
+
+    def test_clinician_can_access_patient_list(self):
+        self.client.force_login(self.clinician)
+        resp = self.client.get('/patients/')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_analyst_blocked_from_patient_create(self):
+        self.client.force_login(self.analyst)
+        resp = self.client.get('/patients/new/')
+        # user_passes_test usually redirects to login if check fails
+        self.assertEqual(resp.status_code, 302)
+
+    def test_clinician_blocked_from_user_management(self):
+        self.client.force_login(self.clinician)
+        resp = self.client.get('/accounts/users/')
+        self.assertEqual(resp.status_code, 302)
+
+    def test_admin_can_access_user_management(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/accounts/users/')
+        self.assertEqual(resp.status_code, 200)

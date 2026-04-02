@@ -42,6 +42,8 @@
                     <td>
                         {% if u.is_active %}
                         <span class="badge bg-success">Active</span>
+                        {% elif not u.last_login %}
+                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Pending Approval</span>
                         {% else %}
                         <span class="badge bg-secondary">Inactive</span>
                         {% endif %}
