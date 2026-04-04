@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Clinical Dashboard{% endblock %}
+{% block page_title %}Clinical Dashboard{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'patient_create' %}" class="btn-primary btn-sm"><i class="bi bi-person-plus"></i> Add Patient</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Summary Metrics -->
+<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px;">
+  <div class="metric-card">
+    <div class="metric-label">Active Cases</div>
+    <div class="metric-value">{{ active_count }}</div>
+    <div class="metric-sub">Patients currently in treatment</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">High Risk</div>
+    <div class="metric-value" style="color:var(--risk-high);">{{ high_risk_patients|length }}</div>
+    <div class="metric-sub">Require immediate clinical review</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Assessment Due</div>
+    <div class="metric-value" style="color:var(--color-warning);">{{ needs_prediction|length }}</div>
+    <div class="metric-sub">Entering month 3-4 window</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Total Managed</div>
+    <div class="metric-value">{{ total_assigned }}</div>
+    <div class="metric-sub">All-time patient registrations</div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Critical Alerts & Windows -->
+  <div class="col-lg-8">
+    
+    <!-- High Risk Alerts -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-exclamation-octagon" style="color:var(--color-danger);"></i> High Risk Attention Required</h3>
+        </div>
+        {% for item in high_risk_patients %}
+        <div class="alert alert-high" style="cursor: pointer;" onclick="location.href='{% url 'patient_dashboard' item.patient.patient_id %}'">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div style="flex: 1;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong>{{ item.patient.name }}</strong>
+                    <span class="badge badge-high">{{ item.score }}% Risk Score</span>
+                </div>
+                <div style="font-size:12px; margin-top:4px; opacity: 0.8;">Action: Schedule pulmonary function test & specialist referral.</div>
+            </div>
+        </div>
+        {% empty %}
+        <div style="padding: 20px; text-align: center; color: var(--text-tertiary);">
+            <i class="bi bi-shield-check" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+            No high-priority alerts today.
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Prediction Window -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Prediction Window (Month 3-4)</h3>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Treatment Start</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in needs_prediction %}
+                    <tr>
+                        <td><strong>{{ p.name }}</strong></td>
+                        <td style="color: var(--text-secondary);">{{ p.treatment_start_date|date:"M d, Y" }}</td>
+                        <td><span class="badge badge-active">Window Open</span></td>
+                        <td>
+                            <a href="{% url 'patient_dashboard' p.patient_id %}" class="btn-primary btn-sm">Run Assessment</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-tertiary); padding: 40px;">
+                            No patients currently in the month 3-4 assessment window.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+  </div>
+
+  <!-- Right Column: Recent Activity -->
+  <div class="col-lg-4">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Activity</h3>
+            <a href="{% url 'patient_list' %}" class="btn-secondary btn-sm" style="font-size: 11px;">View All</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            {% for p in recent_activity %}
+            <div class="user-row" style="padding: 12px; border: 0.5px solid var(--border-light); border-radius: var(--radius-md); transition: background 0.2s;" onclick="location.href='{% url 'patient_dashboard' p.patient_id %}'">
+                <div class="user-avatar" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                    <i class="bi bi-person"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 13px; font-weight: 600;">{{ p.name }}</div>
+                    <div style="font-size: 11px; color: var(--text-tertiary);">Registered: {{ p.created_at|date:"M d" }}</div>
+                </div>
+                <i class="bi bi-chevron-right" style="font-size: 12px; color: var(--text-muted);"></i>
+            </div>
+            {% empty %}
+            <div style="text-align: center; color: var(--text-tertiary); padding: 20px;">No recent activity.</div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Quick Tips Card -->
+    <div class="card" style="background: var(--bg-secondary); border: none;">
+        <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--accent-hover);">Clinical Guidance</h4>
+        <p style="font-size: 12px; line-height: 1.5;">Assessments are most accurate between months 3 and 4 of treatment. High-risk patients should be referred for specialty pulmonary care within 4 weeks of prediction.</p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,7 +1,7 @@
-﻿venv/
+venv/
 .env
 __pycache__/
-*.pkl
+# *.pkl was here - removing to track models for FYP
 *.sqlite3
 *.docx
 extracted_doc.txt

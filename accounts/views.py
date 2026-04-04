@@ -2,6 +2,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from .models import User
+from .supabase_utils import create_supabase_user_admin
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def is_admin(user):
@@ -36,8 +40,17 @@ def user_create(request):
 
         user = User.objects.create_user(username=username, email=email, password=password)
         user.role = role
+        
+        # Sync with Supabase Auth
+        try:
+            sb_user = create_supabase_user_admin(email, password, {"role": role, "username": username})
+            user.supabase_uid = sb_user.user.id
+            messages.success(request, f'User "{username}" created successfully as {role} (Synced to Supabase).')
+        except Exception as e:
+            logger.error(f"Failed to sync user {username} to Supabase: {e}")
+            messages.warning(request, f'User "{username}" created locally but Supabase sync failed: {e}')
+            
         user.save()
-        messages.success(request, f'User "{username}" created successfully as {role}.')
         return redirect('user_management')
 
     return redirect('user_management')
@@ -111,6 +124,15 @@ def register(request):
         user = User.objects.create_user(username=username, email=email, password=password)
         user.role = role if role in ['CLINICIAN', 'ANALYST'] else 'ANALYST'
         user.is_active = False # Require admin activation
+        
+        # Sync with Supabase Auth
+        try:
+            sb_user = create_supabase_user_admin(email, password, {"role": user.role, "username": username})
+            user.supabase_uid = sb_user.user.id
+        except Exception as e:
+            logger.error(f"Registration sync to Supabase failed for {username}: {e}")
+            # We still allow local registration to succeed, but log the error (user will be inactive anyway)
+            
         user.save()
         
         messages.success(request, 'Registration successful! Your account is pending admin approval. You will be able to log in once an administrator activates it.')

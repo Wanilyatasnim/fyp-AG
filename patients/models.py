@@ -16,6 +16,18 @@ class Patient(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, related_name='patients_created'
     )
+    assigned_clinician = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, limit_choices_to={'role': 'CLINICIAN'},
+        related_name='assigned_patients'
+    )
+    treatment_status = models.CharField(
+        max_length=20, 
+        choices=[('Active', 'Active'), ('Completed', 'Completed'), ('Lost', 'Lost to Follow-up')],
+        default='Active'
+    )
+    treatment_start_date = models.DateField(null=True, blank=True)
+    dob = models.DateField(null=True, blank=True)
 
     # ── Dataset Column 1: Notification_Date ───────────────────────────────
     Notification_Date = models.DateField(null=True, blank=True)

@@ -9,21 +9,21 @@ Trains 3 models on the cleaned dataset:
 Output: ml_engine/models/*.pkl files
 """
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
-import joblib
-
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    roc_auc_score, f1_score, recall_score,
-    confusion_matrix, classification_report
-)
-from imblearn.over_sampling import SMOTE
 import xgboost as xgb
+import shap
+
+# ── Django Setup ──
+import os
+import django
+import sys
+
+# Set up Django environment so we can save to models
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tbptld.settings')
+django.setup()
+
+from ml_engine.models import ModelMetric
+from sklearn.metrics import accuracy_score, precision_score
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
@@ -178,7 +178,44 @@ for name, res in results.items():
 
 print(f"\n★  Best model by Recall: {best_model_name} ({best_recall:.4f})")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. SAVE METRICS TO DATABASE
+# ─────────────────────────────────────────────────────────────────────────────
+print("\nSaving metrics to database...")
+best_res = results[best_model_name]
+y_val_pred = best_res['val_pred']
+y_val_proba = best_res['val_proba']
+
+# Calculate final metrics for the best model
+acc = accuracy_score(y_val, y_val_pred)
+prec = precision_score(y_val, y_val_pred, pos_label=0)
+rec = recall_score(y_val, y_val_pred, pos_label=0)
+f1 = f1_score(y_val, y_val_pred, pos_label=0)
+auc = roc_auc_score(y_val, y_val_proba)
+
+# Global SHAP calculation
+print("Calculating global SHAP values...")
+explainer = shap.TreeExplainer(best_res['model'])
+shap_vals = explainer.shap_values(X_val)
+if isinstance(shap_vals, list): # For some versions of SHAP/models
+    shap_vals = shap_vals[0]
+global_importance = {
+    col: float(np.abs(shap_vals[:, i]).mean())
+    for i, col in enumerate(FEATURE_COLS)
+}
+
+ModelMetric.objects.create(
+    version="1.1.0 (Auto)",
+    model_name=best_model_name,
+    accuracy=acc,
+    precision=prec,
+    recall=rec,
+    f1_score=f1,
+    auc_roc=auc,
+    global_importance=global_importance
+)
+
 # Save feature column list for inference
 joblib.dump(FEATURE_COLS, MODELS_DIR / 'feature_cols.pkl')
-print(f"\nAll models saved to: {MODELS_DIR}")
+print(f"\nAll models and metrics saved.")
 print("Training complete!")

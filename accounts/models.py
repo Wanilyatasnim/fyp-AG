@@ -9,6 +9,7 @@ class User(AbstractUser):
         ('ANALYST', 'Data Analyst'),
     ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLINICIAN')
+    supabase_uid = models.UUIDField(unique=True, null=True, blank=True)
     
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

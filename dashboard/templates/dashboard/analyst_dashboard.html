@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}Population Analytics{% endblock %}
+{% block page_title %}Population Analytics{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'export_anonymized_data' %}" class="btn-secondary btn-sm">
+    <i class="bi bi-download"></i> Export CSV
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Population Metrics -->
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px;">
+  <div class="metric-card">
+    <div class="metric-label">Total Cohort</div>
+    <div class="metric-value">{{ total_patients }}</div>
+    <div class="metric-sub">Total patients in registry</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Systems Monitoring</div>
+    <div class="metric-value">Active</div>
+    <div class="metric-sub">Real-time prediction engine</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Data Privacy</div>
+    <div class="metric-value">Anonymized</div>
+    <div class="metric-sub">PII stripped at source</div>
+  </div>
+</div>
+
+<div class="row g-4">
+    <!-- Risk Distribution -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">Risk Category Breakdown</h3>
+            </div>
+            <div style="padding: 10px;">
+                <canvas id="riskPieChart" height="280"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sex Breakdown -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">Demographics (Sex)</h3>
+            </div>
+            <div style="padding: 10px;">
+                <canvas id="sexBarChart" height="280"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Trend -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">New Case Registration</h3>
+            </div>
+            <div style="padding: 10px;">
+                <canvas id="trendLineChart" height="280"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Pass -->
+<script id="risk-data" type="application/json">{{ risk_dist_json|safe }}</script>
+<script id="sex-data" type="application/json">{{ sex_dist_json|safe }}</script>
+<script id="trend-labels" type="application/json">{{ trend_labels|safe }}</script>
+<script id="trend-values" type="application/json">{{ trend_values|safe }}</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Theme Colors
+    const colors = {
+        high: '#dc2626',
+        moderate: '#d97706',
+        low: '#16a34a',
+        accent: '#d97706',
+        text: '#1a1916',
+        border: 'rgba(26,25,22,0.12)'
+    };
+
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#6b6860';
+
+    // 1. Risk Pie Chart
+    const riskData = JSON.parse(document.getElementById('risk-data').textContent);
+    new Chart(document.getElementById('riskPieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(riskData),
+            datasets: [{
+                data: Object.values(riskData),
+                backgroundColor: [colors.high, colors.moderate, colors.low],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, padding: 20 } }
+            }
+        }
+    });
+
+    // 2. Sex Bar Chart
+    const sexData = JSON.parse(document.getElementById('sex-data').textContent);
+    new Chart(document.getElementById('sexBarChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(sexData),
+            datasets: [{
+                data: Object.values(sexData),
+                backgroundColor: '#efede8',
+                borderColor: colors.text,
+                borderWidth: 0.5,
+                borderRadius: 4,
+                barThickness: 40
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { display: false } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // 3. Trends Line Chart
+    const trendLabels = JSON.parse(document.getElementById('trend-labels').textContent);
+    const trendValues = JSON.parse(document.getElementById('trend-values').textContent);
+    new Chart(document.getElementById('trendLineChart'), {
+        type: 'line',
+        data: {
+            labels: trendLabels,
+            datasets: [{
+                label: 'New Cases',
+                data: trendValues,
+                fill: true,
+                backgroundColor: 'rgba(217, 119, 6, 0.05)',
+                borderColor: colors.accent,
+                borderWidth: 2,
+                pointBackgroundColor: colors.accent,
+                pointRadius: 3,
+                tension: 0.4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: colors.border }, ticks: { stepSize: 1 } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+</script>
+{% endblock %}

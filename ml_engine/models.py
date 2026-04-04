@@ -14,3 +14,17 @@ class Prediction(models.Model):
 
     def __str__(self):
         return f"Prediction {self.risk_category} ({self.risk_score:.2f}) for Patient {self.patient_id_id} on {self.prediction_date.strftime('%Y-%m-%d')}"
+
+class ModelMetric(models.Model):
+    version = models.CharField(max_length=50, default='1.0.0')
+    accuracy = models.FloatField()
+    precision = models.FloatField()
+    recall = models.FloatField()
+    f1_score = models.FloatField()
+    auc_roc = models.FloatField()
+    global_importance = models.JSONField(help_text="Global SHAP values")
+    model_name = models.CharField(max_length=100, default='XGBoost')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __cl__(self):
+        return f"Metric v{self.version} ({self.auc_roc:.4f})"

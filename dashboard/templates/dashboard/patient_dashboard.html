@@ -1,284 +1,289 @@
 {% extends 'base.html' %}
-
-{% block title %}Patient Dashboard — {{ patient.name }}{% endblock %}
+{% block title %}Patient Detail — {{ patient.name }}{% endblock %}
+{% block page_title %}Patient Detail{% endblock %}
 
 {% block extra_css %}
 <style>
-  .risk-badge-low {
-    background: var(--color-risk-low);
-    color: #fff;
-  }
-
-  .risk-badge-moderate {
-    background: var(--color-risk-moderate);
-    color: #fff;
-  }
-
-  .risk-badge-high {
-    background: var(--color-risk-high);
-    color: #fff;
-  }
-
-  .gauge-wrap {
-    position: relative;
-    width: 220px;
-    margin: auto;
-  }
-
-  .gauge-center-text {
-    position: absolute;
-    bottom: 20px;
-    width: 100%;
-    text-align: center;
-  }
-
-  .shap-bar-pos {
-    background: #C62828;
-    height: 18px;
-    border-radius: 3px;
-  }
-
-  .shap-bar-neg {
-    background: #2E7D32;
-    height: 18px;
-    border-radius: 3px;
-  }
+  .gauge-wrap { position: relative; width: 200px; margin: 0 auto; }
+  .gauge-center-text { position: absolute; bottom: 15px; width: 100%; text-align: center; }
+  .shap-bar { height: 8px; border-radius: 4px; transition: width 0.6s ease; }
+  .shap-row { margin-bottom: 16px; padding: 12px; border-radius: var(--radius-md); background: var(--bg-secondary); }
 </style>
+{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex; gap:8px;">
+    <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="btn-secondary btn-sm">
+        <i class="bi bi-calendar-plus"></i> Record Visit
+    </a>
+    <form method="post" action="{% url 'generate_prediction' patient.patient_id %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn-primary btn-sm">
+            <i class="bi bi-cpu"></i> {% if prediction %}Update Prediction{% else %}Run Prediction{% endif %}
+        </button>
+    </form>
+</div>
 {% endblock %}
 
 {% block content %}
 {% load static %}
 
-{# ── Identity Card ── #}
-<div class="row g-3 mb-3">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h4 class="mb-1">{{ patient.name }}</h4>
-          <small class="text-muted">ID: {{ patient.patient_id }}</small><br>
-          <small class="text-muted">Age: {{ patient.Age|default:"—" }} &nbsp;|&nbsp; Sex: {{
-            patient.get_Sex_display|default:"—" }}</small>
+<!-- Data for JS -->
+<script id="risk-score-data" type="application/json">{{ prediction.risk_score|default:0|floatformat:4 }}</script>
+<script id="shap-data" type="application/json">{{ shap_data_json|safe }}</script>
+<script id="visits-data" type="application/json">
+[
+    {% for v in patient.visits.all %}
+    {"month": {{ v.visit_month }}, "result": {{ v.bacilloscopy_result|default:"null" }}}{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<!-- Header Identity Card -->
+<div class="card" style="padding: 20px; border-left: 4px solid var(--accent-primary);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="user-avatar" style="width: 48px; height: 48px; font-size: 18px; background: var(--bg-tertiary); color: var(--text-primary);">
+                {{ patient.name|slice:":1"|upper }}
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 20px;">{{ patient.name }}</h1>
+                <div style="font-size: 12px; color: var(--text-tertiary);">
+                    ID: {{ patient.patient_id|upper }} &nbsp;•&nbsp; 
+                    Registry Date: {{ patient.created_at|date:"M d, Y" }}
+                </div>
+            </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          {% if prediction %}
-          <span class="badge fs-6 risk-badge-{{ prediction.risk_category|lower }}">
-            {{ prediction.risk_category }} Risk &nbsp; {{ prediction.risk_score|floatformat:2 }}
-          </span>
-          {% else %}
-          <span class="badge bg-secondary fs-6">No Prediction Yet</span>
-          {% endif %}
-          {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
-          <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="btn btn-sm btn-outline-success">
-            <i class="bi bi-calendar-plus"></i> Add Visit
-          </a>
-          <form method="post" action="{% url 'generate_prediction' patient.patient_id %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-primary" title="Run ML prediction now">
-              <i class="bi bi-cpu-fill me-1"></i>Generate Prediction
-            </button>
-          </form>
-          {% endif %}
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span class="badge {% if patient.treatment_status == 'Active' %}badge-active{% else %}badge-default{% endif %}" style="padding: 6px 12px; font-size: 12px;">
+                {{ patient.treatment_status }}
+            </span>
+            {% if prediction %}
+            <span class="badge badge-{{ prediction.risk_category|lower }}" style="padding: 6px 12px; font-size: 12px;">
+                {{ prediction.risk_category }} PTLD Risk
+            </span>
+            {% endif %}
         </div>
-      </div>
     </div>
-  </div>
 </div>
 
-<div class="row g-3">
-
-  {# ── Semi-circle Risk Gauge ── #}
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-header fw-bold">Risk Score</div>
-      <div class="card-body text-center">
-        <div class="gauge-wrap">
-          <canvas id="riskGauge" width="220" height="130"></canvas>
-          <div class="gauge-center-text">
-            <span class="fs-4 fw-bold" id="gaugeLabel">
-              {% if prediction %}{{ prediction.risk_score|floatformat:0 }}%{% else %}—{% endif %}
-            </span><br>
-            <small class="text-muted">Risk Score</small>
-          </div>
+<div class="row g-4">
+    <!-- Left Column: Patient Profile -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Clinical Profile</h3>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: var(--text-secondary);">Age / Sex</span>
+                    <span style="font-weight: 500;">{{ patient.Age }}y / {{ patient.get_Sex_display }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: var(--text-secondary);">HIV Status</span>
+                    <span class="badge {% if patient.HIV == 1 %}badge-high{% else %}badge-default{% endif %}">{{ patient.get_HIV_display }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: var(--text-secondary);">Comorbidities</span>
+                    <span style="font-weight: 500;">
+                        {% if patient.Diabetes_Comorbidity == 1 %}Diabetes{% endif %}
+                        {% if patient.Smoking_Comorbidity == 1 %}{% if patient.Diabetes_Comorbidity == 1 %}, {% endif %}Smoking{% endif %}
+                        {% if patient.Diabetes_Comorbidity == 0 and patient.Smoking_Comorbidity == 0 %}None Reported{% endif %}
+                    </span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 10px; border-top: 0.5px solid var(--border-light);">
+                    <span style="color: var(--text-secondary);">TB Type</span>
+                    <span style="font-weight: 500;">{{ patient.get_Clinical_Form_display }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: var(--text-secondary);">X-Ray Findings</span>
+                    <span style="font-weight: 500; text-align: right;">{{ patient.get_Chest_X_Ray_display }}</span>
+                </div>
+            </div>
         </div>
-        {% if prediction %}
-        <p class="mt-2 mb-0">
-          Model: <code>{{ prediction.model_used }}</code><br>
-          <small class="text-muted">{{ prediction.prediction_date|date:"Y-m-d H:i" }}</small>
-        </p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
 
-  {# ── 6-month Bacilloscopy Chart ── #}
-  <div class="col-md-8">
-    <div class="card h-100">
-      <div class="card-header fw-bold">6-Month Serial Bacilloscopy</div>
-      <div class="card-body">
-        <canvas id="bacilloChart" height="120"></canvas>
-      </div>
+        <div class="card" style="background-color: var(--bg-secondary); border: none;">
+            <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px;">Clinical Summary</h4>
+            <p style="font-size: 12.5px; color: var(--text-secondary);">
+                Patient is on a standard treatment regimen. Bacilloscopy monitor reflects the bacterial load over the 6-month intensive and maintenance phases.
+            </p>
+        </div>
     </div>
-  </div>
 
-  {# ── SHAP Risk Explanation ── #}
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header fw-bold">Risk Factor Contributions (SHAP)</div>
-      <div class="card-body">
-        {% if prediction and prediction.shap_values %}
-        <ul class="list-group list-group-flush" id="shapList"></ul>
-        {% else %}
-        <p class="text-muted">No SHAP explanation available yet.</p>
-        {% endif %}
-      </div>
+    <!-- Right Column: Prediction & Explanations -->
+    <div class="col-lg-8">
+        <div class="row g-4">
+            <!-- Risk Gauge & Recommendations -->
+            <div class="col-md-5">
+                <div class="card h-100" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px;">
+                    <div class="gauge-wrap">
+                        <canvas id="riskGauge" width="200" height="110"></canvas>
+                        <div class="gauge-center-text">
+                            <div style="font-size: 28px; font-weight: 700;">{% if prediction %}{{ prediction.risk_score|floatformat:0 }}%{% else %}—{% endif %}</div>
+                            <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Risk Score</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-7">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title">Recommendations</h3>
+                    </div>
+                    {% if prediction %}
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            {% for rec in recommendations %}
+                            <div style="display: flex; gap: 10px; font-size: 13px; align-items: start;">
+                                <i class="bi bi-check-circle" style="color: var(--color-success); font-size: 14px;"></i>
+                                <span style="color: var(--text-primary); line-height: 1.4;">{{ rec }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div style="text-align: center; padding: 24px; color: var(--text-tertiary);">
+                            <i class="bi bi-robot" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+                            Run a machine learning prediction to see tailor-made clinical actions.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- SHAP Explainability -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Risk Factor Analysis (SHAP)</h3>
+                        <div style="font-size: 11px; color: var(--text-tertiary);">Explainable AI Insights</div>
+                    </div>
+                    {% if prediction and prediction.shap_values %}
+                    <div class="row g-3" id="shapListContainer">
+                        <!-- SHAP bars injected via JS -->
+                    </div>
+                    {% else %}
+                    <div style="padding: 40px; text-align: center; color: var(--text-tertiary);">
+                        No analysis data available. Run a prediction to see feature importance.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bacilloscopy Chart -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Bacilloscopy Trend</h3>
+                    </div>
+                    <div style="padding: 10px;">
+                        <canvas id="bacilloChart" height="120"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-
-  {# ── Recommendations ── #}
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header fw-bold">Clinical Recommendations</div>
-      <div class="card-body">
-        {% if prediction %}
-        {% if prediction.risk_category == "High" %}
-        <ol>
-          <li>Immediately review drug susceptibility results and consider MDR-TB protocol.</li>
-          <li>Increase monitoring visits to fortnightly until Month 6.</li>
-          <li>Consult infectious disease specialist.</li>
-          <li>Reassess comorbidity management (HIV, diabetes, etc.).</li>
-        </ol>
-        {% elif prediction.risk_category == "Moderate" %}
-        <ol>
-          <li>Monitor monthly as scheduled; do not miss visits.</li>
-          <li>Review bacilloscopy results at Month 3 if still positive.</li>
-          <li>Assess supervised treatment adherence.</li>
-        </ol>
-        {% else %}
-        <ol>
-          <li>Continue standard treatment protocol.</li>
-          <li>Encourage adherence and complete the 6-month course.</li>
-          <li>Routine follow-up at scheduled intervals.</li>
-        </ol>
-        {% endif %}
-        {% else %}
-        <p class="text-muted">Recommendations available once at least 2 monitoring visits and 3 months of treatment are
-          recorded.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-  // ── Risk Gauge (Doughnut clipped to semi-circle) ──
-  const riskScore = {{ prediction.risk_score|default: 0 | floatformat: 4 }};
-  const gaugeCtx = document.getElementById('riskGauge').getContext('2d');
-  new Chart(gaugeCtx, {
-    type: 'doughnut',
-    data: {
-      datasets: [{
-        data: [riskScore * 100, 100 - riskScore * 100],
-        backgroundColor: [
-          riskScore > 0.67 ? '#C62828' : riskScore > 0.33 ? '#F9A825' : '#2E7D32',
-          '#e9ecef'
-        ],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      rotation: -90,
-      circumference: 180,
-      cutout: '75%',
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      animation: { animateRotate: true, duration: 1000 }
-    }
-  });
+    const themeColors = {
+        high: '#dc2626',
+        moderate: '#d97706',
+        low: '#16a34a',
+        accent: '#d97706',
+        secondary: '#efede8'
+    };
 
-  // ── Bacilloscopy Line Chart ──
-  const visits = [
-    {% for v in patient.visits.all %}
-  { month: { { v.visit_month } }, result: { { v.bacilloscopy_result |default: "null" } } },
-  {% endfor %}
-];
-  const monthLabels = ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6'];
-  const resultMap = {};
-  visits.forEach(v => { if (v.result !== null) resultMap[v.month] = v.result; });
-  const chartData = monthLabels.map((_, i) => resultMap[i + 1] !== undefined ? resultMap[i + 1] : null);
-
-  // Plugin: red/yellow shaded overlay for risk months
-  const riskOverlayPlugin = {
-    id: 'riskOverlay',
-    beforeDraw(chart) {
-      const { ctx, chartArea: { left, right, top, bottom }, scales: { x } } = chart;
-      if (!x) return;
-      const slotW = (right - left) / 6;
-
-      // Yellow zone: Month 3–4 (index 2-3)
-      ctx.save();
-      ctx.fillStyle = 'rgba(249,168,37,0.18)';
-      ctx.fillRect(left + slotW * 2, top, slotW * 2, bottom - top);
-
-      // Red zone: Month 5–6 (index 4-5)
-      ctx.fillStyle = 'rgba(198,40,40,0.13)';
-      ctx.fillRect(left + slotW * 4, top, slotW * 2, bottom - top);
-      ctx.restore();
-    }
-  };
-
-  const bacilloCtx = document.getElementById('bacilloChart').getContext('2d');
-  new Chart(bacilloCtx, {
-    type: 'line',
-    plugins: [riskOverlayPlugin],
-    data: {
-      labels: monthLabels,
-      datasets: [{
-        label: 'Bacilloscopy (1=+ve, 2=-ve)',
-        data: chartData,
-        borderColor: '#1565C0',
-        backgroundColor: 'rgba(21,101,192,0.1)',
-        tension: 0.3,
-        fill: true,
-        spanGaps: true
-      }]
-    },
-    options: {
-      scales: {
-        y: { min: 0, max: 4, ticks: { stepSize: 1 } }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            afterBody: () => ['\n🟡 Yellow = moderate risk period (M3-4)', '🔴 Red = high risk period (M5-6)']
-          }
+    // 1. Risk Gauge
+    const riskScore = parseFloat(document.getElementById('risk-score-data').textContent);
+    const gaugeCtx = document.getElementById('riskGauge').getContext('2d');
+    new Chart(gaugeCtx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [riskScore * 100, 100 - (riskScore * 100)],
+                backgroundColor: [
+                    riskScore > 0.67 ? themeColors.high : riskScore > 0.33 ? themeColors.moderate : themeColors.low,
+                    themeColors.secondary
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            rotation: -90,
+            circumference: 180,
+            cutout: '85%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: { animateRotate: true, duration: 800 }
         }
-      }
-    }
-  });
-
-  // ── SHAP Explanation List ──
-  const shapData = {{ shap_data_json| safe }};
-  const shapList = document.getElementById('shapList');
-  if (shapList && shapData) {
-    const sorted = Object.entries(shapData).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    sorted.forEach(([feat, val]) => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item px-0 py-2';
-      const barWidth = Math.min(Math.abs(val) * 200, 100).toFixed(1);
-      const direction = val >= 0 ? 'increases' : 'decreases';
-      const barClass = val >= 0 ? 'shap-bar-pos' : 'shap-bar-neg';
-      li.innerHTML = `<div class="d-flex justify-content-between mb-1">
-      <span>${feat.replace(/_/g, ' ')}</span>
-      <small class="text-muted">${direction} risk (${val.toFixed(3)})</small>
-    </div>
-    <div class="${barClass}" style="width:${barWidth}%"></div>`;
-      shapList.appendChild(li);
     });
-  }
+
+    // 2. SHAP Bars
+    const shapData = JSON.parse(document.getElementById('shap-data').textContent);
+    const shapContainer = document.getElementById('shapListContainer');
+    if (shapContainer && shapData) {
+        const sorted = Object.entries(shapData).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
+        sorted.slice(0, 8).forEach(([feat, val]) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6';
+            const barWidth = Math.min(Math.abs(val) * 150, 100).toFixed(1);
+            const color = val >= 0 ? themeColors.high : themeColors.low;
+            const direction = val >= 0 ? 'Increase' : 'Decrease';
+            
+            col.innerHTML = `
+                <div class="shap-row">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px;">
+                        <span style="font-weight:600;">${feat.replace(/_/g, ' ')}</span>
+                        <span style="color:${color}; font-weight:500;">${direction}</span>
+                    </div>
+                    <div style="background:var(--bg-tertiary); height:6px; border-radius:3px; position:relative;">
+                        <div class="shap-bar" style="width:${barWidth}%; background:${color}; height:6px;"></div>
+                    </div>
+                </div>
+            `;
+            shapContainer.appendChild(col);
+        });
+    }
+
+    // 3. Bacilloscopy Chart
+    const visits = JSON.parse(document.getElementById('visits-data').textContent);
+    const monthLabels = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6'];
+    const resultMap = {};
+    visits.forEach(v => { if (v.result !== null) resultMap[v.month] = v.result; });
+    const chartData = monthLabels.map((_, i) => resultMap[i + 1] !== undefined ? resultMap[i + 1] : null);
+
+    new Chart(document.getElementById('bacilloChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                data: chartData,
+                borderColor: '#1a1916',
+                backgroundColor: 'rgba(26, 25, 22, 0.03)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: '#fff',
+                pointBorderWidth: 2,
+                spanGaps: true
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { 
+                    min: 0, max: 2.5, 
+                    ticks: { 
+                        stepSize: 1,
+                        callback: v => v === 1 ? 'Pos' : v === 2 ? 'Neg' : ''
+                    },
+                    grid: { color: 'rgba(0,0,0,0.03)' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
 </script>
 {% endblock %}

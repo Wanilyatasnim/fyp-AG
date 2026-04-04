@@ -58,6 +58,10 @@ class MonitoringVisit(models.Model):
         choices=[(1,'Positive'),(2,'Negative'),(3,'Not Performed')], null=True, blank=True
     )
     visit_date     = models.DateField(null=True, blank=True)
+    weight         = models.FloatField(null=True, blank=True)
+    bmi            = models.FloatField(null=True, blank=True)
+    symptoms       = models.JSONField(default=dict, blank=True)
+    adverse_events = models.TextField(blank=True, null=True)
     clinical_notes = models.TextField(blank=True, null=True)
     recorded_by    = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

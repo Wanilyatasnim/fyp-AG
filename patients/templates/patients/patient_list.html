@@ -1,97 +1,118 @@
 {% extends 'base.html' %}
+{% block title %}Patient Registry{% endblock %}
+{% block page_title %}Patient Registry{% endblock %}
+
+{% block topbar_actions %}
+{% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
+<a href="{% url 'patient_create' %}" class="btn-primary btn-sm">
+    <i class="bi bi-person-plus-fill"></i> Add Patient
+</a>
+{% endif %}
+{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h2>Patient Management</h2>
-    </div>
-    <div class="col text-end">
-        {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
-        <a href="{% url 'patient_create' %}" class="btn btn-primary">
-            <i class="bi bi-person-plus-fill"></i> Add Patient
-        </a>
-        {% endif %}
-    </div>
+
+<!-- Search & Filters -->
+<div class="card" style="padding: 16px; margin-bottom: 24px;">
+    <form method="get" style="display: grid; grid-template-columns: 1fr 200px 200px 100px; gap: 12px; align-items: center;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" name="q" class="form-control" placeholder="Search by name or ID..." value="{{ request.GET.q }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <select name="status" class="form-control">
+                <option value="">All Statuses</option>
+                <option value="Active" {% if request.GET.status == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Completed" {% if request.GET.status == 'Completed' %}selected{% endif %}>Completed</option>
+                <option value="Lost" {% if request.GET.status == 'Lost' %}selected{% endif %}>Lost to Follow-up</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <select name="risk" class="form-control">
+                <option value="">All Risk Levels</option>
+                <option value="High" {% if request.GET.risk == 'High' %}selected{% endif %}>High Risk</option>
+                <option value="Moderate" {% if request.GET.risk == 'Moderate' %}selected{% endif %}>Moderate Risk</option>
+                <option value="Low" {% if request.GET.risk == 'Low' %}selected{% endif %}>Low Risk</option>
+            </select>
+        </div>
+        <button class="btn-secondary" type="submit" style="padding: 9px;">Filter</button>
+    </form>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <form method="get" class="mb-4">
-            <div class="input-group">
-                <input type="text" name="q" class="form-control" placeholder="Search by name..." value="{{ request.GET.q }}">
-                <button class="btn btn-outline-secondary" type="submit">Search</button>
-            </div>
-        </form>
-
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Patient ID</th>
-                        <th>Age</th>
-                        <th>Date Registered</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for patient in page_obj %}
-                    <tr>
-                        <td>{{ patient.name }}</td>
-                        <td>{{ patient.patient_id|stringformat:"s"|slice:":8" }}...</td>
-                        <td>{{ patient.Age|default:"Unknown" }}</td>
-                        <td>{{ patient.created_at|date:"Y-m-d" }}</td>
-                        <td>
-                            <a href="{% url 'patient_detail' patient.patient_id %}" class="btn btn-sm btn-info text-white"><i class="bi bi-eye"></i> View</a>
+<!-- Results Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="padding-left: 24px;">Patient Identity</th>
+                    <th>Status</th>
+                    <th>Treat. Start</th>
+                    <th>PTLD Risk</th>
+                    <th style="text-align: right; padding-right: 24px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for patient in page_obj %}
+                <tr>
+                    <td style="padding-left: 24px;">
+                        <div style="font-weight: 600; color: var(--text-primary);">{{ patient.name }}</div>
+                        <div style="font-size: 11px; color: var(--text-tertiary);">UUID: {{ patient.patient_id|stringformat:"s"|slice:":8"|upper }}</div>
+                    </td>
+                    <td>
+                        <span class="badge {% if patient.treatment_status == 'Active' %}badge-active{% elif patient.treatment_status == 'Completed' %}badge-completed{% else %}badge-default{% endif %}">
+                            {{ patient.treatment_status }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">{{ patient.treatment_start_date|default:"—" }}</td>
+                    <td>
+                        {% with latest=patient.predictions.all.0 %}
+                        {% if latest %}
+                            <span class="badge badge-{{ latest.risk_category|lower }}">
+                                {{ latest.risk_category }}
+                            </span>
+                        {% else %}
+                            <span style="color: var(--text-muted); font-size: 11px; font-style: italic;">No prediction</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td style="text-align: right; padding-right: 24px;">
+                        <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                            <a href="{% url 'patient_detail' patient.patient_id %}" class="icon-btn" title="View Dashboard"><i class="bi bi-graph-up"></i></a>
                             {% if user.role == 'ADMIN' or user.role == 'CLINICIAN' %}
-                            <a href="{% url 'patient_update' patient.patient_id %}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Edit</a>
-                            <a href="{% url 'patient_delete' patient.patient_id %}" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Delete</a>
+                            <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="icon-btn" title="Record Visit"><i class="bi bi-calendar-plus"></i></a>
+                            <a href="{% url 'patient_update' patient.patient_id %}" class="icon-btn" style="color: var(--risk-moderate);" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'patient_delete' patient.patient_id %}" class="icon-btn" style="color: var(--risk-high);" title="Delete"><i class="bi bi-trash"></i></a>
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center">No patients found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 60px; color: var(--text-tertiary);">
+                        <i class="bi bi-search" style="font-size: 32px; display: block; margin-bottom: 12px; opacity: 0.5;"></i>
+                        No patients found matching your search.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="padding: 16px 24px; border-top: 0.5px solid var(--border-light); display: flex; justify-content: center; align-items: center; gap: 16px; background: var(--bg-secondary);">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.risk %}&risk={{ request.GET.risk }}{% endif %}" class="btn-secondary btn-sm"><i class="bi bi-chevron-left"></i> Previous</a>
+        {% endif %}
+        
+        <div style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
         </div>
 
-        <!-- Pagination Controls -->
-        {% if page_obj.has_other_pages %}
-        <nav aria-label="Patient pagination" class="mt-4">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page=1{% if query %}&q={{ query }}{% endif %}">&laquo; First</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
-                </li>
-                {% else %}
-                <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
-                <li class="page-item disabled"><span class="page-link">Previous</span></li>
-                {% endif %}
-
-                <li class="page-item active" aria-current="page">
-                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                </li>
-
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}">Last &raquo;</a>
-                </li>
-                {% else %}
-                <li class="page-item disabled"><span class="page-link">Next</span></li>
-                <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
-                {% endif %}
-            </ul>
-        </nav>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.risk %}&risk={{ request.GET.risk }}{% endif %}" class="btn-secondary btn-sm">Next <i class="bi bi-chevron-right"></i></a>
         {% endif %}
     </div>
+    {% endif %}
 </div>
 {% endblock %}
