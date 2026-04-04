@@ -45,13 +45,16 @@ class MLModelTests(TestCase):
 
     def test_T51_model_metric_exists(self):
         """T51: Verify ModelMetric record can be queried for performance auditing."""
-        # Create a dummy metric record as per previous instructions
+        # Create a metric record with all required fields
         ModelMetric.objects.create(
-            model_name="XGBoost_Production",
-            auroc=0.89,
+            model_name="Ensemble_Production",
+            auc_roc=0.89,
             accuracy=0.85,
-            f1_score=0.82
+            precision=0.84,
+            recall=0.83,
+            f1_score=0.82,
+            global_importance={"Age": 0.4, "Sex": 0.2}
         )
         metric = ModelMetric.objects.latest('created_at')
-        self.assertEqual(metric.auroc, 0.89)
-        self.assertEqual(metric.model_name, "XGBoost_Production")
+        self.assertEqual(metric.auc_roc, 0.89)
+        self.assertEqual(metric.model_name, "Ensemble_Production")

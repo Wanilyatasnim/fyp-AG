@@ -113,14 +113,21 @@ def _load_model(name):
     import joblib
     path = MODELS_DIR / f'{name}.pkl'
     if path.exists():
-        return joblib.load(path)
+        try:
+            model = joblib.load(path)
+            # Compatibility patch for sklearn 1.5.2 -> 1.7.2 unpickling issues
+            if name == 'logistic_regression' and not hasattr(model, 'multi_class'):
+                model.multi_class = 'ovr'
+            return model
+        except Exception:
+            return None
     return None
 
 
 def predict_ptld_risk(patient):
     """
-    Run PTLD risk prediction for a Patient instance.
-    Returns: (risk_score, risk_category, model_used, shap_values)
+    Run PTLD risk prediction for a Patient instance using a Mean Probability Ensemble.
+    Combines outputs from Logistic Regression, Random Forest, and XGBoost.
     """
     scaler  = _load_model('scaler')
     xgb_m   = _load_model('xgboost')
@@ -128,30 +135,46 @@ def predict_ptld_risk(patient):
     lr_m    = _load_model('logistic_regression')
 
     feature_vec = _extract_features(patient)
+    
+    available_probas = []
+    used_models = []
 
-    # Priority: XGBoost → RF → LR → Dummy
+    # 1. XGBoost
     if xgb_m is not None:
-        model      = xgb_m
-        model_name = 'XGBoost (trained)'
-        proba      = model.predict_proba(feature_vec)[0]
-    elif rf_m is not None:
-        model      = rf_m
-        model_name = 'Random Forest (trained)'
-        proba      = model.predict_proba(feature_vec)[0]
-    elif lr_m is not None and scaler is not None:
-        model      = lr_m
-        model_name = 'Logistic Regression (trained)'
-        proba      = model.predict_proba(scaler.transform(feature_vec))[0]
-    else:
-        # Dummy fallback until training is done
+        proba = xgb_m.predict_proba(feature_vec)[0]
+        # proba[0] = High Risk (label 0), proba[1] = Low Risk (label 1)
+        available_probas.append(float(proba[0]))
+        used_models.append("XGB")
+
+    # 2. Random Forest
+    if rf_m is not None:
+        proba = rf_m.predict_proba(feature_vec)[0]
+        available_probas.append(float(proba[0]))
+        used_models.append("RF")
+
+    # 3. Logistic Regression (requires scaled features)
+    if lr_m is not None and scaler is not None:
+        scaled_features = scaler.transform(feature_vec)
+        proba = lr_m.predict_proba(scaled_features)[0]
+        available_probas.append(float(proba[0]))
+        used_models.append("LR")
+
+    # Handle fallback if no models exist
+    if not available_probas:
         model_name = 'Placeholder (not trained)'
         risk_score = random.uniform(0, 1)
         category   = 'Low' if risk_score <= 0.33 else ('Moderate' if risk_score <= 0.67 else 'High')
         shap_values = {f: round(random.uniform(-0.3, 0.3), 3) for f in FEATURE_COLS[:5]}
         return risk_score, category, model_name, shap_values
 
-    # proba[0] = High Risk (label 0), proba[1] = Low Risk (label 1)
-    high_risk_score = float(proba[0])
+    # Calculate Ensemble Mean Probability
+    high_risk_score = sum(available_probas) / len(available_probas)
+    
+    # Build dynamic model label
+    if len(used_models) > 1:
+        model_name = f"Ensemble ({' + '.join(used_models)})"
+    else:
+        model_name = f"{used_models[0]} (trained)"
 
     if high_risk_score <= 0.33:
         category = 'Low'
@@ -160,22 +183,32 @@ def predict_ptld_risk(patient):
     else:
         category = 'High'
 
+    # Best single model for SHAP (Priority: XGB -> RF -> LR)
+    model_for_shap = xgb_m or rf_m or lr_m
+
     # SHAP values
     shap_values = {}
     try:
         import shap
         if xgb_m is not None:
-            explainer = shap.TreeExplainer(model)
+            explainer = shap.TreeExplainer(model_for_shap)
             sv = explainer.shap_values(feature_vec)[0]
         elif rf_m is not None:
-            explainer = shap.TreeExplainer(model)
+            explainer = shap.TreeExplainer(model_for_shap)
             sv = explainer.shap_values(feature_vec)[0]
+        elif lr_m is not None and scaler is not None:
+            scaled_features = scaler.transform(feature_vec)
+            explainer = shap.LinearExplainer(model_for_shap, masker=shap.maskers.Independent(scaled_features))
+            sv = explainer.shap_values(scaled_features)[0]
         else:
-            explainer = shap.LinearExplainer(model, masker=shap.maskers.Independent(feature_vec))
-            sv = explainer.shap_values(feature_vec)[0]
-        # Top 5 by absolute contribution
-        top5 = sorted(zip(FEATURE_COLS, sv), key=lambda x: abs(x[1]), reverse=True)[:5]
-        shap_values = {k: round(float(v), 4) for k, v in top5}
+            sv = None
+
+        if sv is not None:
+            # Top 5 by absolute contribution
+            top5 = sorted(zip(FEATURE_COLS, sv), key=lambda x: abs(x[1]), reverse=True)[:5]
+            shap_values = {k: round(float(v), 4) for k, v in top5}
+        else:
+            shap_values = {f: 0.0 for f in FEATURE_COLS[:5]}
     except Exception:
         shap_values = {f: 0.0 for f in FEATURE_COLS[:5]}
 
