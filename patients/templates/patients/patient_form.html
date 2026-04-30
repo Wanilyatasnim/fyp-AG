@@ -1,38 +1,203 @@
 {% extends 'base.html' %}
+{% block extra_css %}
+<style>
+    .form-section-title {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--accent-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 16px 0 8px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-card {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .nav-tabs .nav-link {
+        border: none;
+        color: var(--text-tertiary);
+        padding: 12px 20px;
+        font-size: 14px;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    .nav-tabs .nav-link.active {
+        color: var(--accent-primary);
+        border-bottom: 2px solid var(--accent-primary);
+        background: transparent;
+    }
+    .nav-tabs .nav-link:hover:not(.active) {
+        color: var(--text-secondary);
+        border-bottom: 2px solid var(--border-medium);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h2>{{ title }}</h2>
+<div style="max-width: 1000px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <div>
+            <h1 style="margin: 0; font-size: 24px;">{{ title }}</h1>
+            <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-tertiary);">Ensuring high-fidelity data entry for PTLD risk analysis</p>
+        </div>
+        <a href="{% url 'patient_list' %}" class="btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Registry
+        </a>
     </div>
-    <div class="col text-end">
-        <a href="{% url 'patient_list' %}" class="btn btn-secondary">Cancel</a>
-    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="card" style="padding: 0; border: 1px solid var(--border-light); overflow: hidden;">
+            <div style="background: var(--bg-secondary); padding: 0 24px; border-bottom: 1px solid var(--border-light);">
+                <ul class="nav nav-tabs" id="patientFormTabs" role="tablist" style="border: none;">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="demo-tab" data-bs-toggle="tab" data-bs-target="#demo-pane" type="button" role="tab">
+                        <i class="bi bi-person-badge"></i> Demographics
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="drugs-tab" data-bs-toggle="tab" data-bs-target="#drugs-pane" type="button" role="tab">
+                        <i class="bi bi-test-tube"></i> Laboratory Report
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="monitor-tab" data-bs-toggle="tab" data-bs-target="#monitor-pane" type="button" role="tab">
+                        <i class="bi bi-calendar-check"></i> Monitoring
+                    </button>
+                  </li>
+                </ul>
+            </div>
+
+            <div class="card-body" style="padding: 32px;">
+                <div class="tab-content" id="patientFormTabsContent">
+                    <!-- Tab 1: Demographics & Clinical -->
+                    <div class="tab-pane fade show active" id="demo-pane" role="tabpanel">
+                        <div class="form-section-title"><i class="bi bi-info-circle"></i> Biographical Information</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-6">{{ form.name.label_tag }} {{ form.name }}</div>
+                            <div class="col-md-3">{{ form.dob.label_tag }} {{ form.dob }}</div>
+                            <div class="col-md-3">{{ form.Age.label_tag }} {{ form.Age }}</div>
+                            <div class="col-md-4">{{ form.Sex.label_tag }} {{ form.Sex }}</div>
+                            <div class="col-md-4">{{ form.Race.label_tag }} {{ form.Race }}</div>
+                            <div class="col-md-4">{{ form.State.label_tag }} {{ form.State }}</div>
+                        </div>
+
+                        <div class="form-section-title"><i class="bi bi-clipboard-pulse"></i> Clinical Baseline</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-4">{{ form.Notification_Date.label_tag }} {{ form.Notification_Date }}</div>
+                            <div class="col-md-4">{{ form.treatment_start_date.label_tag }} {{ form.treatment_start_date }}</div>
+                            <div class="col-md-4">{{ form.treatment_status.label_tag }} {{ form.treatment_status }}</div>
+                            <div class="col-md-4">{{ form.Chest_X_Ray.label_tag }} {{ form.Chest_X_Ray }}</div>
+                            <div class="col-md-4">{{ form.Clinical_Form.label_tag }} {{ form.Clinical_Form }}</div>
+                            <div class="col-md-4">{{ form.HIV.label_tag }} {{ form.HIV }}</div>
+                        </div>
+
+                        <div class="form-section-title"><i class="bi bi-heart-pulse"></i> Comorbidities</div>
+                        <div class="row g-4">
+                            <div class="col-md-3">{{ form.AIDS_Comorbidity.label_tag }} {{ form.AIDS_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Diabetes_Comorbidity.label_tag }} {{ form.Diabetes_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Smoking_Comorbidity.label_tag }} {{ form.Smoking_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Alcoholism_Comorbidity.label_tag }} {{ form.Alcoholism_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Mental_Disorder_Comorbidity.label_tag }} {{ form.Mental_Disorder_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Drug_Addiction_Comorbidity.label_tag }} {{ form.Drug_Addiction_Comorbidity }}</div>
+                            <div class="col-md-3">{{ form.Occupational_Disease.label_tag }} {{ form.Occupational_Disease }}</div>
+                            <div class="col-md-3">{{ form.Other_Comorbidity.label_tag }} {{ form.Other_Comorbidity }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Laboratory -->
+                    <div class="tab-pane fade" id="drugs-pane" role="tabpanel">
+                        <div id="mdr-tb-warning" class="alert alert-danger d-none fw-bold mb-4" style="border-radius: var(--radius-md); border-left: 5px solid #dc3545;">
+                            <i class="bi bi-exclamation-triangle-fill"></i> MDR-TB Detected: High Risk Clinical Override Triggered
+                        </div>
+                        
+                        <div class="form-section-title"><i class="bi bi-shield-exclamation"></i> Primary Drug Susceptibility</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-6">{{ treatment_form.Rifampicin.label_tag }} {{ treatment_form.Rifampicin }}</div>
+                            <div class="col-md-6">{{ treatment_form.Isoniazid.label_tag }} {{ treatment_form.Isoniazid }}</div>
+                        </div>
+
+                        <div class="form-section-title"><i class="bi bi-list-check"></i> Secondary Resistance Profile</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-3">{{ treatment_form.Pyrazinamide.label_tag }} {{ treatment_form.Pyrazinamide }}</div>
+                            <div class="col-md-3">{{ treatment_form.Ethambutol.label_tag }} {{ treatment_form.Ethambutol }}</div>
+                            <div class="col-md-3">{{ treatment_form.Streptomycin.label_tag }} {{ treatment_form.Streptomycin }}</div>
+                            <div class="col-md-3">{{ treatment_form.Ethionamide.label_tag }} {{ treatment_form.Ethionamide }}</div>
+                        </div>
+
+                        <div class="form-section-title"><i class="bi bi-microscope"></i> Bacteriology Core</div>
+                        <div class="row g-4">
+                            <div class="col-md-4">{{ treatment_form.Bacilloscopy_Sputum.label_tag }} {{ treatment_form.Bacilloscopy_Sputum }}</div>
+                            <div class="col-md-4">{{ treatment_form.Sputum_Culture.label_tag }} {{ treatment_form.Sputum_Culture }}</div>
+                            <div class="col-md-4">{{ treatment_form.Bacilloscopy_Other.label_tag }} {{ treatment_form.Bacilloscopy_Other }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Monitoring -->
+                    <div class="tab-pane fade" id="monitor-pane" role="tabpanel">
+                        <div class="form-section-title"><i class="bi bi-graph-up"></i> Treatment Progression</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-md-4">{{ treatment_form.Days_In_Treatment.label_tag }} {{ treatment_form.Days_In_Treatment }}</div>
+                            <div class="col-md-4">{{ treatment_form.Supervised_Treatment.label_tag }} {{ treatment_form.Supervised_Treatment }}</div>
+                            <div class="col-md-4">{{ treatment_form.Outcome_Status.label_tag }} {{ treatment_form.Outcome_Status }}</div>
+                        </div>
+
+                        <div class="form-section-title"><i class="bi bi-list-ol"></i> Monthly Bacilloscopy Results</div>
+                        <div class="row g-3">
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_1.label_tag }} {{ treatment_form.Bacilloscopy_Month_1 }}</div>
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_2.label_tag }} {{ treatment_form.Bacilloscopy_Month_2 }}</div>
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_3.label_tag }} {{ treatment_form.Bacilloscopy_Month_3 }}</div>
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_4.label_tag }} {{ treatment_form.Bacilloscopy_Month_4 }}</div>
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_5.label_tag }} {{ treatment_form.Bacilloscopy_Month_5 }}</div>
+                            <div class="col-md-4 col-lg-2">{{ treatment_form.Bacilloscopy_Month_6.label_tag }} {{ treatment_form.Bacilloscopy_Month_6 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-secondary); padding: 24px; border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn-primary" style="padding: 14px 40px; font-size: 15px;">
+                    <i class="bi bi-check2-circle"></i> Save Patient Profile
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-            <div class="row g-3">
-                {% for field in form %}
-                <div class="col-md-6 col-lg-4">
-                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}
-                    <div class="form-text">{{ field.help_text }}</div>
-                    {% endif %}
-                    {% for error in field.errors %}
-                        <div class="invalid-feedback d-block">{{ error }}</div>
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-            
-            <div class="mt-4 border-top pt-3 text-end">
-                <button type="submit" class="btn btn-primary border border-2 border-dark shadow-sm">Save Patient</button>
-            </div>
-        </form>
-    </div>
-</div>
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rifampicin = document.getElementById('id_Rifampicin');
+    const isoniazid = document.getElementById('id_Isoniazid');
+    const warning = document.getElementById('mdr-tb-warning');
+
+    function checkMDR() {
+        if (rifampicin && isoniazid) {
+            // '2' denotes Resistant in the Treatment model
+            if (rifampicin.value === '2' && isoniazid.value === '2') {
+                warning.classList.remove('d-none');
+            } else {
+                warning.classList.add('d-none');
+            }
+        }
+    }
+
+    if (rifampicin && isoniazid) {
+        rifampicin.addEventListener('change', checkMDR);
+        isoniazid.addEventListener('change', checkMDR);
+        // Initial check on load
+        checkMDR();
+    }
+});
+</script>
+{% endblock %}
 {% endblock %}

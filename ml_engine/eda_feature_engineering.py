@@ -163,9 +163,23 @@ df['Age_Risk_Category'] = pd.cut(
 # Binary target: 1=Low Risk (Outcome_Status==1), 0=High Risk (Outcome_Status==3)
 df['Target'] = (df['Outcome_Status'] == 1).astype(int)
 
+# Feature 1 — Is this MDR-TB? (both major drugs resistant)
+df['MDR_TB'] = ((df['Rifampicin'] == 2) & (df['Isoniazid'] == 2)).astype(int)
+
+# Feature 2 — Is sputum still positive in late months?
+df['Persistent_Positive'] = (
+    (df['Bacilloscopy_Month_4'] == 1) | 
+    (df['Bacilloscopy_Month_5'] == 1) | 
+    (df['Bacilloscopy_Month_6'] == 1)
+).astype(int)
+
+# Feature 3 — The danger combination flag
+df['Treatment_Failing'] = ((df['MDR_TB'] == 1) & (df['Persistent_Positive'] == 1)).astype(int)
+
 print("\n─── Engineered Features ───")
 eng_cols = ['Drug_Resistance_Count', 'Comorbidity_Count', 'Persistent_Positive_Months',
-            'Bacilloscopy_Clearance_Rate', 'Disease_Severity_Score', 'Age_Risk_Category', 'Target']
+            'Bacilloscopy_Clearance_Rate', 'Disease_Severity_Score', 'Age_Risk_Category', 
+            'MDR_TB', 'Persistent_Positive', 'Treatment_Failing', 'Target']
 print(df[eng_cols].describe())
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -29,8 +29,8 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <i class="bi bi-lungs-fill" style="color: var(--accent-primary);"></i>
-            TB Care System
+            <i class="bi bi-lungs-fill" style="color: var(--accent-primary); font-size: 24px;"></i>
+            <span>TB Predict</span>
         </div>
 
         <nav class="sidebar-nav">
@@ -43,7 +43,7 @@
             {% endif %}
 
             <!-- Clinician Specific -->
-            {% if user|has_group:"Clinician" %}
+            {% if user.role == 'CLINICIAN' or user.role == 'ADMIN' %}
             <div class="nav-section-label">Clinical Care</div>
             <a href="{% url 'clinician_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'clinician_dashboard' %}active{% endif %}">
                 <i class="bi bi-hospital"></i> My Patients
@@ -51,13 +51,13 @@
             <a href="{% url 'patient_list' %}" class="nav-link {% if 'patient_list' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="bi bi-people"></i> Registry
             </a>
-            <a href="{% url 'patient_create' %}" class="nav-link">
+            <a href="{% url 'patient_create' %}" class="nav-link {% if request.resolver_match.url_name == 'patient_create' %}active{% endif %}">
                 <i class="bi bi-person-plus"></i> New Patient
             </a>
             {% endif %}
 
             <!-- Analyst Specific -->
-            {% if user|has_group:"Analyst" %}
+            {% if user.role == 'ANALYST' or user.role == 'ADMIN' %}
             <div class="nav-section-label">Analytics Hub</div>
             <a href="{% url 'analyst_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'analyst_dashboard' %}active{% endif %}">
                 <i class="bi bi-bar-chart-line"></i> Distribution
@@ -69,22 +69,14 @@
                 <i class="bi bi-download"></i> Data Export
             </a>
             {% endif %}
-
-            <!-- Admin Specific -->
-            {% if user.role == 'ADMIN' %}
-            <div class="nav-section-label">Administration</div>
-            <a href="{% url 'admin:index' %}" class="nav-link" target="_blank">
-                <i class="bi bi-shield-lock"></i> Backend Admin
-            </a>
-            {% endif %}
         </nav>
 
         <div class="sidebar-bottom">
             <div class="user-row" onclick="location.href='{% url 'profile_view' %}'">
                 <div class="user-avatar">{{ user.username|slice:":1"|upper }}</div>
                 <div style="flex: 1; overflow: hidden;">
-                    <div style="font-size:13px; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ user.get_full_name|default:user.username }}</div>
-                    <div style="font-size:11px; color:var(--text-tertiary);">{{ user.get_role_display }}</div>
+                    <div style="font-size:13px; font-weight:700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ user.username }}</div>
+                    <div style="font-size:11px; color:var(--text-tertiary); font-weight: 500;">{{ user.get_role_display }}</div>
                 </div>
             </div>
         </div>
@@ -97,11 +89,11 @@
         {% if user.is_authenticated %}
         <div class="topbar">
             <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
-            <div style="display:flex; gap:12px; align-items:center;">
+            <div style="display:flex; gap:16px; align-items:center;">
                 {% block topbar_actions %}{% endblock %}
                 <form method="post" action="{% url 'logout' %}" style="margin:0;">
                     {% csrf_token %}
-                    <button type="submit" class="btn-secondary" style="padding: 6px 14px; font-size: 12px;">Sign out</button>
+                    <button type="submit" class="btn-secondary" style="padding: 8px 16px; font-size: 13px;">Sign out</button>
                 </form>
             </div>
         </div>
@@ -110,8 +102,8 @@
         <div class="page-body">
             {% if messages %}
                 {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    <i class="bi bi-info-circle"></i>
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}" style="border-radius: var(--radius-md); padding: 16px; margin-bottom: 24px; border: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px; font-weight: 500;">
+                    <i class="bi bi-info-circle-fill"></i>
                     <div>{{ message }}</div>
                 </div>
                 {% endfor %}

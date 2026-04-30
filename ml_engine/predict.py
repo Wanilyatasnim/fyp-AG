@@ -27,6 +27,7 @@ FEATURE_COLS = [
     'Days_In_Treatment', 'Age',
     'Drug_Resistance_Count', 'Comorbidity_Count', 'Persistent_Positive_Months',
     'Bacilloscopy_Clearance_Rate', 'Disease_Severity_Score', 'Age_Risk_Category',
+    'MDR_TB', 'Persistent_Positive', 'Treatment_Failing',
 ]
 
 
@@ -62,6 +63,11 @@ def _extract_features(patient):
     comorbidity_count        = sum(1 for v in comorbidity_values if v == 1)
     persistent_positive      = sum(1 for v in month_values if v == 1)
     clearance_rate           = (month_values[5] if month_values[5] != 3 else 2) - (month_values[0] if month_values[0] != 3 else 2)
+    
+    mdr_tb = 1 if (tv('Rifampicin', 3) == 2 and tv('Isoniazid', 3) == 2) else 0
+    persistent_pos_flag = 1 if any(tv(f'Bacilloscopy_Month_{i}', 3) == 1 for i in [4, 5, 6]) else 0
+    treatment_failing = 1 if (mdr_tb == 1 and persistent_pos_flag == 1) else 0
+
     chest_val                = patient.Chest_X_Ray or 2
     bac_sputum_val           = tv('Bacilloscopy_Sputum', 2) or 2
     disease_severity_score   = chest_val + bac_sputum_val
@@ -97,7 +103,7 @@ def _extract_features(patient):
         *drug_values,
         tv('Supervised_Treatment', 1) or 1,
         *month_values,
-        tv('Days_In_Treatment', 180) or 180,
+        tv('Days_In_Treatment', 0) or 0,
         age_val,
         drug_resistance_count,
         comorbidity_count,
@@ -105,6 +111,9 @@ def _extract_features(patient):
         clearance_rate,
         disease_severity_score,
         age_risk,
+        mdr_tb,
+        persistent_pos_flag,
+        treatment_failing,
     ]
     return np.array(row).reshape(1, -1)
 
@@ -122,6 +131,37 @@ def _load_model(name):
         except Exception:
             return None
     return None
+
+
+def apply_clinical_override(ml_score, patient):
+    try:
+        t = patient.treatment
+    except Exception:
+        t = None
+        
+    def tv(field, default=3):
+        return getattr(t, field, default)
+        
+    rif = tv('Rifampicin', 3)
+    iso = tv('Isoniazid', 3)
+    aids = getattr(patient, 'AIDS_Comorbidity', 2)
+    sputum_m3 = tv('Bacilloscopy_Month_3', 3)
+    sputum_m4 = tv('Bacilloscopy_Month_4', 3)
+    
+    # Rule 1 — MDR-TB + sputum still positive at month 4
+    if rif == 2 and iso == 2 and sputum_m4 == 1:
+        ml_score = max(ml_score, 0.75)
+        
+    # Rule 2 — AIDS + sputum positive beyond month 3
+    if aids == 1 and sputum_m3 == 1:
+        ml_score = max(ml_score, 0.60)
+        
+    # Rule 3 — All 6 months sputum positive
+    months = [tv(f'Bacilloscopy_Month_{i}', 3) for i in range(1, 7)]
+    if all(m == 1 for m in months):
+        ml_score = max(ml_score, 0.70)
+        
+    return ml_score
 
 
 def predict_ptld_risk(patient):
@@ -170,6 +210,9 @@ def predict_ptld_risk(patient):
     # Calculate Ensemble Mean Probability
     high_risk_score = sum(available_probas) / len(available_probas)
     
+    # Apply Clinical Override
+    high_risk_score = apply_clinical_override(high_risk_score, patient)
+    
     # Build dynamic model label
     if len(used_models) > 1:
         model_name = f"Ensemble ({' + '.join(used_models)})"
@@ -204,12 +247,12 @@ def predict_ptld_risk(patient):
             sv = None
 
         if sv is not None:
-            # Top 5 by absolute contribution
-            top5 = sorted(zip(FEATURE_COLS, sv), key=lambda x: abs(x[1]), reverse=True)[:5]
-            shap_values = {k: round(float(v), 4) for k, v in top5}
+            # Return ALL features and their SHAP values to the frontend for categorization
+            shap_values = {feat: round(float(val), 4) for feat, val in zip(FEATURE_COLS, sv)}
         else:
-            shap_values = {f: 0.0 for f in FEATURE_COLS[:5]}
+            # Default empty values if SHAP fails
+            shap_values = {f: 0.0 for f in FEATURE_COLS}
     except Exception:
-        shap_values = {f: 0.0 for f in FEATURE_COLS[:5]}
+        shap_values = {f: 0.0 for f in FEATURE_COLS}
 
     return high_risk_score, category, model_name, shap_values

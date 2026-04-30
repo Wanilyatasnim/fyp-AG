@@ -12,48 +12,113 @@
     </div>
 </div>
 
+<!-- ── Best Model Summary Cards ── -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card shadow-sm p-4 border-0 text-center">
-            <div class="small fw-bold text-muted mb-1">ROC-AUC</div>
+            <div class="small fw-bold text-muted mb-1">ROC-AUC <span class="text-primary">(Best)</span></div>
             <div class="display-6 fw-bold">{% if metrics %}{{ metrics.auc_roc|floatformat:4 }}{% else %}N/A{% endif %}</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm p-4 border-0 text-center">
-            <div class="small fw-bold text-muted mb-1">Accuracy</div>
+            <div class="small fw-bold text-muted mb-1">Accuracy <span class="text-primary">(Best)</span></div>
             <div class="display-6 fw-bold">{% if metrics %}{{ metrics.accuracy|floatformat:4 }}{% else %}N/A{% endif %}</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm p-4 border-0 text-center">
-            <div class="small fw-bold text-muted mb-1">Recall (Sensitivity)</div>
+            <div class="small fw-bold text-muted mb-1">Recall / Sensitivity <span class="text-primary">(Best)</span></div>
             <div class="display-6 fw-bold">{% if metrics %}{{ metrics.recall|floatformat:4 }}{% else %}N/A{% endif %}</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm p-4 border-0 text-center">
-            <div class="small fw-bold text-muted mb-1">F1 Score</div>
+            <div class="small fw-bold text-muted mb-1">F1 Score <span class="text-primary">(Best)</span></div>
             <div class="display-6 fw-bold">{% if metrics %}{{ metrics.f1_score|floatformat:4 }}{% else %}N/A{% endif %}</div>
         </div>
     </div>
 </div>
 
+<!-- ── Per-Model Comparison Table ── -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-0 text-dark">Per-Model Comparison (Test Set)</h5>
+            <small class="text-muted">Evaluated on a held-out 15% test split. Best performer highlighted in green.</small>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="px-4">Model</th>
+                        <th class="text-center">Accuracy</th>
+                        <th class="text-center">Precision</th>
+                        <th class="text-center">Recall&nbsp;<small class="text-muted fw-normal">(Sensitivity)</small></th>
+                        <th class="text-center">F1 Score</th>
+                        <th class="text-center">AUC-ROC</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if all_metrics %}
+                        {% for m in all_metrics %}
+                        <tr {% if forloop.first %}class="table-success"{% endif %}>
+                            <td class="px-4 fw-bold">
+                                {% if m.model_name == 'LogisticRegression' %}Logistic Regression
+                                {% elif m.model_name == 'RandomForest' %}Random Forest
+                                {% elif m.model_name == 'XGBoost' %}XGBoost
+                                {% else %}{{ m.model_name }}{% endif %}
+                            </td>
+                            <td class="text-center">{{ m.accuracy|floatformat:4 }}</td>
+                            <td class="text-center">{{ m.precision|floatformat:4 }}</td>
+                            <td class="text-center">{{ m.recall|floatformat:4 }}</td>
+                            <td class="text-center">{{ m.f1_score|floatformat:4 }}</td>
+                            <td class="text-center fw-bold">{{ m.auc_roc|floatformat:4 }}</td>
+                            <td class="text-center">
+                                {% if forloop.first %}
+                                    <span class="badge bg-success">★ Best</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Active</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No metrics found. Run <code>python ml_engine/train_models.py</code> to generate metrics.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer bg-white text-muted small py-2 px-4">
+        <i class="bi bi-info-circle"></i>
+        Metrics computed on <strong>held-out 15% test set</strong> using stratified split (random_state=42).
+        Recall/Sensitivity is measured for the <em>High-Risk (class 0)</em> label.
+        Training used 5-fold GridSearchCV with <em>class_weight='balanced'</em>.
+    </div>
+</div>
+
+<!-- ── SHAP Chart + Metadata ── -->
 <div class="row g-4">
-    <!-- Global SHAP Chart -->
     <div class="col-lg-8">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white py-3">
                 <h5 class="mb-0 text-dark">Global Feature Importance (SHAP)</h5>
-                <small class="text-muted">Top variables influencing PTLD risk across the population.</small>
+                <small class="text-muted">Top variables influencing PTLD risk across the population (from best model).</small>
             </div>
             <div class="card-body">
                 <canvas id="globalShapChart" height="240"></canvas>
             </div>
         </div>
     </div>
-    
-    <!-- Model Meta Info -->
+
     <div class="col-lg-4">
         <div class="card shadow-sm border-0 mb-4 h-100">
             <div class="card-header bg-white py-3">
@@ -62,7 +127,7 @@
             <div class="card-body">
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item d-flex justify-content-between px-0">
-                        <span class="text-muted">Algorithm</span>
+                        <span class="text-muted">Best Algorithm</span>
                         <span class="fw-bold">{{ metrics.model_name|default:"Unknown" }}</span>
                     </li>
                     <li class="list-group-item d-flex justify-content-between px-0">
@@ -74,12 +139,24 @@
                         <span class="fw-bold">1,824 records</span>
                     </li>
                     <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Train / Val / Test Split</span>
+                        <span class="fw-bold">70 / 15 / 15 %</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
                         <span class="text-muted">Cross-Validation</span>
-                        <span class="fw-bold text-success"><i class="bi bi-check-circle"></i> Enabled</span>
+                        <span class="fw-bold text-success"><i class="bi bi-check-circle"></i> 5-Fold GridSearchCV</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Class Imbalance Handling</span>
+                        <span class="fw-bold">class_weight='balanced'</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Ensemble Method</span>
+                        <span class="fw-bold">Soft Voting (Mean Proba)</span>
                     </li>
                 </ul>
                 <div class="alert alert-info mt-4 small border-0 shadow-none">
-                    <strong>Note:</strong> Future versions can trigger retrain directly from this dashboard.
+                    <strong>Note:</strong> Metrics use <strong>pos_label=0</strong> (High-Risk class) for Precision, Recall, and F1 — aligned with clinical priority of detecting high-risk patients.
                 </div>
             </div>
         </div>
@@ -93,28 +170,33 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
     const importanceData = JSON.parse(document.getElementById('importance-data').textContent);
-    
+
     // Sort for presentation
     const sortedFields = Object.entries(importanceData)
         .sort((a,b) => b[1] - a[1])
         .slice(0, 10);
 
-    new Chart(document.getElementById('globalShapChart'), {
-        type: 'bar',
-        data: {
-            labels: sortedFields.map(f => f[0].replace(/_/g, ' ')),
-            datasets: [{
-                label: 'Mean absolute SHAP value',
-                data: sortedFields.map(f => f[1]),
-                backgroundColor: '#1565C0',
-                borderRadius: 5
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, title: { display: true, text: 'Importance' } } }
-        }
-    });
+    if (sortedFields.length > 0) {
+        new Chart(document.getElementById('globalShapChart'), {
+            type: 'bar',
+            data: {
+                labels: sortedFields.map(f => f[0].replace(/_/g, ' ')),
+                datasets: [{
+                    label: 'Mean absolute SHAP value',
+                    data: sortedFields.map(f => f[1]),
+                    backgroundColor: '#1565C0',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, title: { display: true, text: 'Importance' } } }
+            }
+        });
+    } else {
+        document.getElementById('globalShapChart').parentElement.innerHTML =
+            '<p class="text-muted text-center py-4">No SHAP data available. Retrain models to generate feature importance.</p>';
+    }
 </script>
 {% endblock %}

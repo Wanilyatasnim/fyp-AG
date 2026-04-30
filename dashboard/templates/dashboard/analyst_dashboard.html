@@ -3,29 +3,29 @@
 {% block page_title %}Population Analytics{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'export_anonymized_data' %}" class="btn-secondary btn-sm">
-    <i class="bi bi-download"></i> Export CSV
+<a href="{% url 'export_anonymized_data' %}" class="btn-secondary">
+    <i class="bi bi-download"></i> Export Analytics CSV
 </a>
 {% endblock %}
 
 {% block content %}
 
 <!-- Population Metrics -->
-<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px;">
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:32px;">
   <div class="metric-card">
     <div class="metric-label">Total Cohort</div>
     <div class="metric-value">{{ total_patients }}</div>
-    <div class="metric-sub">Total patients in registry</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">Verified patient records</div>
   </div>
   <div class="metric-card">
-    <div class="metric-label">Systems Monitoring</div>
-    <div class="metric-value">Active</div>
-    <div class="metric-sub">Real-time prediction engine</div>
+    <div class="metric-label">System Status</div>
+    <div class="metric-value" style="color: var(--color-success);">Operational</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">Real-time risk monitoring</div>
   </div>
   <div class="metric-card">
-    <div class="metric-label">Data Privacy</div>
+    <div class="metric-label">Security Protocol</div>
     <div class="metric-value">Anonymized</div>
-    <div class="metric-sub">PII stripped at source</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">PII-stripped research mode</div>
   </div>
 </div>
 
@@ -34,7 +34,7 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header">
-                <h3 class="card-title">Risk Category Breakdown</h3>
+                <h3 class="card-title">Risk Breakdown</h3>
             </div>
             <div style="padding: 10px;">
                 <canvas id="riskPieChart" height="280"></canvas>
@@ -46,7 +46,7 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header">
-                <h3 class="card-title">Demographics (Sex)</h3>
+                <h3 class="card-title">Patient Demographics</h3>
             </div>
             <div style="padding: 10px;">
                 <canvas id="sexBarChart" height="280"></canvas>
@@ -58,7 +58,7 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header">
-                <h3 class="card-title">New Case Registration</h3>
+                <h3 class="card-title">Case Registration Trends</h3>
             </div>
             <div style="padding: 10px;">
                 <canvas id="trendLineChart" height="280"></canvas>
@@ -77,14 +77,13 @@
 
 {% block extra_js %}
 <script>
-    // Theme Colors
-    const colors = {
+    const themeColors = {
         high: '#dc2626',
         moderate: '#d97706',
         low: '#16a34a',
         accent: '#d97706',
         text: '#1a1916',
-        border: 'rgba(26,25,22,0.12)'
+        border: 'rgba(26,25,22,0.06)'
     };
 
     Chart.defaults.font.family = "'Inter', sans-serif";
@@ -98,15 +97,15 @@
             labels: Object.keys(riskData),
             datasets: [{
                 data: Object.values(riskData),
-                backgroundColor: [colors.high, colors.moderate, colors.low],
+                backgroundColor: [themeColors.high, themeColors.moderate, themeColors.low],
                 borderWidth: 0,
-                hoverOffset: 4
+                hoverOffset: 8
             }]
         },
         options: {
-            cutout: '65%',
+            cutout: '72%',
             plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 12, padding: 20 } }
+                legend: { position: 'bottom', labels: { boxWidth: 10, padding: 16, font: { weight: '600' } } }
             }
         }
     });
@@ -119,17 +118,17 @@
             labels: Object.keys(sexData),
             datasets: [{
                 data: Object.values(sexData),
-                backgroundColor: '#efede8',
-                borderColor: colors.text,
-                borderWidth: 0.5,
-                borderRadius: 4,
-                barThickness: 40
+                backgroundColor: '#efedea',
+                borderColor: themeColors.text,
+                borderWidth: 0,
+                borderRadius: 6,
+                barThickness: 32
             }]
         },
         options: {
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, grid: { display: false } },
+                y: { beginAtZero: true, grid: { display: false }, ticks: { stepSize: 1 } },
                 x: { grid: { display: false } }
             }
         }
@@ -146,18 +145,19 @@
                 label: 'New Cases',
                 data: trendValues,
                 fill: true,
-                backgroundColor: 'rgba(217, 119, 6, 0.05)',
-                borderColor: colors.accent,
-                borderWidth: 2,
-                pointBackgroundColor: colors.accent,
-                pointRadius: 3,
+                backgroundColor: 'rgba(217, 119, 6, 0.03)',
+                borderColor: themeColors.accent,
+                borderWidth: 2.5,
+                pointBackgroundColor: themeColors.accent,
+                pointRadius: 4,
+                pointHoverRadius: 6,
                 tension: 0.4
             }]
         },
         options: {
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, grid: { color: colors.border }, ticks: { stepSize: 1 } },
+                y: { beginAtZero: true, grid: { color: themeColors.border }, ticks: { stepSize: 2 } },
                 x: { grid: { display: false } }
             }
         }

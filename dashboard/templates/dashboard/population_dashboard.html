@@ -1,111 +1,147 @@
 {% extends 'base.html' %}
-{% block title %}Population Dashboard — TB-PTLD{% endblock %}
-
-{% block extra_css %}
-<style>
-  .stat-card { border-left: 5px solid; }
-  .stat-card.patients { border-color: #1565C0; }
-  .stat-card.avg-risk  { border-color: #F9A825; }
-  .stat-card.high-risk { border-color: #C62828; }
-</style>
-{% endblock %}
+{% block title %}Population Overview — TB-PTLD{% endblock %}
+{% block page_title %}Population Overview{% endblock %}
 
 {% block content %}
-<div class="row mb-3 align-items-center">
-  <div class="col"><h2 class="mb-0">Population Dashboard</h2></div>
-</div>
 
-{# ── 3 Stat Cards ── #}
-<div class="row g-3 mb-4">
-  <div class="col-md-4">
-    <div class="card stat-card patients p-3">
-      <div class="text-muted small">Active Patients Monitored</div>
-      <div class="fs-2 fw-bold text-primary">{{ total_patients }}</div>
-    </div>
+{# ── 3 Stat Metric Cards ── #}
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px;">
+  <div class="metric-card">
+    <div class="metric-label"><i class="bi bi-people-fill" style="margin-right:6px;"></i>Active Patients</div>
+    <div class="metric-value">{{ total_patients }}</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 8px;">Currently in treatment</div>
   </div>
-  <div class="col-md-4">
-    <div class="card stat-card avg-risk p-3">
-      <div class="text-muted small">Avg. Risk Score</div>
-      <div class="fs-2 fw-bold" style="color:#F9A825">{{ avg_risk_score|floatformat:2|default:"—" }}</div>
-    </div>
+  <div class="metric-card">
+    <div class="metric-label"><i class="bi bi-activity" style="margin-right:6px;"></i>Avg. Risk Score</div>
+    <div class="metric-value" style="color: var(--risk-moderate);">{{ avg_risk_score|floatformat:2|default:"—" }}</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 8px;">Population-level mean</div>
   </div>
-  <div class="col-md-4">
-    <div class="card stat-card high-risk p-3">
-      <div class="text-muted small">High-Risk Patients</div>
-      <div class="fs-2 fw-bold text-danger">{{ high_risk_count|default:"—" }}</div>
-    </div>
+  <div class="metric-card">
+    <div class="metric-label"><i class="bi bi-exclamation-triangle-fill" style="margin-right:6px;"></i>High-Risk Patients</div>
+    <div class="metric-value" style="color: var(--risk-high);">{{ high_risk_count|default:"—" }}</div>
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 8px;">Requires immediate review</div>
   </div>
 </div>
 
 {# ── Monthly Risk Trends Chart ── #}
-<div class="card mb-4">
-  <div class="card-header fw-bold">Monthly Risk Trends</div>
-  <div class="card-body">
-    <canvas id="riskTrendChart" height="80"></canvas>
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3 class="card-title">Monthly Risk Trends</h3>
+      <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">6-month population risk distribution</div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 4px 10px; border-radius: 4px; font-weight: 600; border: 1px solid var(--border-light);">LIVE</div>
   </div>
+  <canvas id="riskTrendChart" height="80"></canvas>
 </div>
 
-{# ── Patient List Summary Table ── #}
-<div class="card">
-  <div class="card-header fw-bold">Patient Summary</div>
-  <div class="card-body p-0">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
+{# ── Patient Summary Table ── #}
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="padding: 24px 24px 16px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
+    <div>
+      <h3 class="card-title" style="margin-bottom: 2px;">Patient Summary</h3>
+      <div style="font-size: 11px; color: var(--text-tertiary);">All registered records with latest risk status</div>
+    </div>
+    <a href="{% url 'patient_list' %}" class="btn-secondary btn-sm">View Full Registry</a>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
         <tr>
-          <th>Name</th>
+          <th style="padding-left: 24px;">Patient</th>
           <th>Age</th>
           <th>Latest Risk</th>
-          <th>Action</th>
+          <th style="text-align: right; padding-right: 24px;">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for p in patients %}
         <tr>
-          <td>{{ p.name }}</td>
-          <td>{{ p.age|default:"—" }}</td>
+          <td style="padding-left: 24px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="user-avatar" style="width: 32px; height: 32px; font-size: 12px; border-radius: 6px; background: var(--bg-tertiary); color: var(--text-secondary);">
+                {{ p.name|slice:":1"|upper }}
+              </div>
+              <div>
+                <div style="font-weight: 600;">{{ p.name }}</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">ID: {{ p.patient_id|stringformat:"s"|slice:":8"|upper }}...</div>
+              </div>
+            </div>
+          </td>
+          <td style="color: var(--text-secondary);">{{ p.age|default:"—" }}</td>
           <td>
             {% with p.predictions.all.0 as pred %}
               {% if pred %}
-                <span class="badge
-                  {% if pred.risk_category == 'High' %}bg-danger
-                  {% elif pred.risk_category == 'Moderate' %}bg-warning text-dark
-                  {% else %}bg-success{% endif %}">
-                  {{ pred.risk_category }}
-                </span>
+                <span class="badge badge-{{ pred.risk_category|lower }}">{{ pred.risk_category }}</span>
               {% else %}
-                <span class="badge bg-secondary">No Data</span>
+                <span class="badge badge-default">No Data</span>
               {% endif %}
             {% endwith %}
           </td>
-          <td><a href="{% url 'patient_dashboard' p.patient_id %}" class="btn btn-sm btn-outline-primary">View</a></td>
+          <td style="text-align: right; padding-right: 24px;">
+            <a href="{% url 'patient_dashboard' p.patient_id %}" class="icon-btn" title="View Dashboard">
+              <i class="bi bi-graph-up"></i>
+            </a>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="text-center py-3 text-muted">No patients found.</td></tr>
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 60px; color: var(--text-tertiary);">
+            <i class="bi bi-people" style="font-size: 32px; display: block; margin-bottom: 12px; opacity: 0.4;"></i>
+            No patients found in registry.
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-// Monthly Risk Trends — placeholder data until real queries are added
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#a09e99';
+
 const ctx = document.getElementById('riskTrendChart').getContext('2d');
 new Chart(ctx, {
   type: 'line',
   data: {
     labels: ['Jan','Feb','Mar','Apr','May','Jun'],
     datasets: [
-      { label:'Low Risk %',      data:[70,68,72,65,60,58], borderColor:'#2E7D32', backgroundColor:'rgba(46,125,50,0.1)', fill:true, tension:0.3 },
-      { label:'Moderate Risk %', data:[20,22,18,25,28,30], borderColor:'#F9A825', backgroundColor:'rgba(249,168,37,0.1)', fill:true, tension:0.3 },
-      { label:'High Risk %',     data:[10,10,10,10,12,12], borderColor:'#C62828', backgroundColor:'rgba(198,40,40,0.1)', fill:true, tension:0.3 }
+      {
+        label: 'Low Risk %',
+        data: [70,68,72,65,60,58],
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22,163,74,0.06)',
+        fill: true, tension: 0.4, pointRadius: 4,
+        pointBackgroundColor: '#fff', pointBorderWidth: 2, pointBorderColor: '#16a34a'
+      },
+      {
+        label: 'Moderate Risk %',
+        data: [20,22,18,25,28,30],
+        borderColor: '#d97706',
+        backgroundColor: 'rgba(217,119,6,0.06)',
+        fill: true, tension: 0.4, pointRadius: 4,
+        pointBackgroundColor: '#fff', pointBorderWidth: 2, pointBorderColor: '#d97706'
+      },
+      {
+        label: 'High Risk %',
+        data: [10,10,10,10,12,12],
+        borderColor: '#dc2626',
+        backgroundColor: 'rgba(220,38,38,0.06)',
+        fill: true, tension: 0.4, pointRadius: 4,
+        pointBackgroundColor: '#fff', pointBorderWidth: 2, pointBorderColor: '#dc2626'
+      }
     ]
   },
   options: {
-    scales: { y: { min:0, max:100, ticks:{ callback:v=>v+'%' } } },
-    plugins: { legend: { position:'bottom' } }
+    scales: {
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.03)' } },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 20, font: { weight: '600', size: 12 } } } }
   }
 });
 </script>

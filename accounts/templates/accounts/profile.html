@@ -1,43 +1,59 @@
 {% extends 'base.html' %}
-
-{% block title %}My Profile{% endblock %}
+{% block title %}My Profile — TB-PTLD{% endblock %}
+{% block page_title %}My Profile{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0 mt-4">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-person-circle"></i> My Profile</h4>
-            </div>
-            <div class="card-body">
-                <table class="table table-borderless">
-                    <tbody>
-                        <tr>
-                            <th class="w-25">Username</th>
-                            <td>{{ user.username }}</td>
-                        </tr>
-                        <tr>
-                            <th>Email Address</th>
-                            <td>{{ user.email|default:"Not provided" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Role</th>
-                            <td><span class="badge bg-secondary">{{ user.get_role_display }}</span></td>
-                        </tr>
-                        <tr>
-                            <th>Account Created</th>
-                            <td>{{ user.date_joined|date:"F j, Y" }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <hr>
-                <div class="d-grid gap-2 d-md-block mt-3">
-                    <a href="{% url 'change_password' %}" class="btn btn-warning">
-                        <i class="bi bi-key-fill"></i> Change Password
-                    </a>
-                </div>
-            </div>
-        </div>
+<div style="max-width: 600px; margin: 0 auto;">
+
+  <!-- Identity Card -->
+  <div class="card" style="padding: 32px; text-align: center;">
+    <div class="user-avatar" style="width: 72px; height: 72px; font-size: 28px; font-weight: 800; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover)); color: #fff;">
+      {{ user.username|slice:":1"|upper }}
     </div>
+    <h1 style="font-size: 22px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.02em;">{{ user.username }}</h1>
+    <p style="font-size: 13px; color: var(--text-tertiary); margin-bottom: 20px;">{{ user.email|default:"No email provided" }}</p>
+    <span class="badge badge-moderate" style="font-size: 12px; padding: 6px 16px;">{{ user.get_role_display }}</span>
+  </div>
+
+  <!-- Profile Details -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Account Details</h3>
+    </div>
+    <div class="pro-list" style="display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border-light);">
+        <div style="font-size: 13px; color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; gap: 10px;">
+          <i class="bi bi-person" style="width: 20px; text-align: center; color: var(--text-tertiary);"></i> Username
+        </div>
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">{{ user.username }}</div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border-light);">
+        <div style="font-size: 13px; color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; gap: 10px;">
+          <i class="bi bi-envelope" style="width: 20px; text-align: center; color: var(--text-tertiary);"></i> Email
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ user.email|default:"Not provided" }}</div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border-light);">
+        <div style="font-size: 13px; color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; gap: 10px;">
+          <i class="bi bi-shield-check" style="width: 20px; text-align: center; color: var(--text-tertiary);"></i> Access Role
+        </div>
+        <span class="badge badge-active">{{ user.get_role_display }}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0;">
+        <div style="font-size: 13px; color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; gap: 10px;">
+          <i class="bi bi-calendar3" style="width: 20px; text-align: center; color: var(--text-tertiary);"></i> Member Since
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ user.date_joined|date:"F j, Y" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div style="display: flex; gap: 12px;">
+    <a href="{% url 'change_password' %}" class="btn-secondary" style="flex: 1; justify-content: center; text-align: center; padding: 13px;">
+      <i class="bi bi-key-fill"></i> Change Password
+    </a>
+  </div>
+
 </div>
 {% endblock %}

@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Patient
-from .forms import PatientForm
+from .forms import PatientForm, TreatmentForm
+from treatments.models import Treatment
 
 def is_clinician_or_admin(user):
     return user.is_authenticated and user.role in ['ADMIN', 'CLINICIAN']
@@ -49,17 +50,31 @@ def patient_list(request):
 def patient_create(request):
     if request.method == 'POST':
         form = PatientForm(request.POST)
-        if form.is_valid():
+        treatment_form = TreatmentForm(request.POST)
+        if form.is_valid() and treatment_form.is_valid():
             patient = form.save(commit=False)
             patient.created_by = request.user
             if request.user.role == 'CLINICIAN':
                 patient.assigned_clinician = request.user
             patient.save()
+            
+            treatment = treatment_form.save(commit=False)
+            treatment.patient = patient
+            
+            # Default missing drug resistance to 1 (Sensitive) to avoid Model crash
+            drugs = ['Rifampicin', 'Isoniazid', 'Ethambutol', 'Streptomycin', 'Pyrazinamide', 'Ethionamide', 'Other_Drugs']
+            for drug in drugs:
+                if not getattr(treatment, drug):
+                    setattr(treatment, drug, 1) # 1 = Sensitive
+                    
+            treatment.save()
+            
             messages.success(request, f'Patient {patient.name} created.')
             return redirect('patient_list')
     else:
         form = PatientForm()
-    return render(request, 'patients/patient_form.html', {'form': form, 'title': 'Add Patient'})
+        treatment_form = TreatmentForm()
+    return render(request, 'patients/patient_form.html', {'form': form, 'treatment_form': treatment_form, 'title': 'Add Patient'})
 
 @login_required
 @user_passes_test(is_clinician_or_admin)
@@ -71,16 +86,30 @@ def patient_update(request, patient_id):
         patient = get_object_or_404(Patient, patient_id=patient_id, assigned_clinician=request.user)
     else:
         patient = get_object_or_404(Patient, patient_id=patient_id)
+        
+    treatment, created = Treatment.objects.get_or_create(patient=patient)
 
     if request.method == 'POST':
         form = PatientForm(request.POST, instance=patient)
-        if form.is_valid():
+        treatment_form = TreatmentForm(request.POST, instance=treatment)
+        if form.is_valid() and treatment_form.is_valid():
             form.save()
+            
+            treatment = treatment_form.save(commit=False)
+            # Default missing drug resistance to 1 (Sensitive)
+            drugs = ['Rifampicin', 'Isoniazid', 'Ethambutol', 'Streptomycin', 'Pyrazinamide', 'Ethionamide', 'Other_Drugs']
+            for drug in drugs:
+                if not getattr(treatment, drug):
+                    setattr(treatment, drug, 1) # 1 = Sensitive
+            treatment.save()
+            
             messages.success(request, f'Patient {patient.name} updated.')
             return redirect('patient_dashboard', patient_id=patient.patient_id)
     else:
         form = PatientForm(instance=patient)
-    return render(request, 'patients/patient_form.html', {'form': form, 'title': 'Edit Patient'})
+        treatment_form = TreatmentForm(instance=treatment)
+        
+    return render(request, 'patients/patient_form.html', {'form': form, 'treatment_form': treatment_form, 'title': 'Edit Patient'})
 
 @login_required
 @user_passes_test(is_clinician_or_admin)

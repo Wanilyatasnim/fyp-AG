@@ -11,6 +11,13 @@ Output: ml_engine/models/*.pkl files
 
 import xgboost as xgb
 import shap
+from pathlib import Path
+import pandas as pd
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+import joblib
 
 # ── Django Setup ──
 import os
@@ -23,7 +30,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tbptld.settings')
 django.setup()
 
 from ml_engine.models import ModelMetric
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
@@ -51,6 +58,7 @@ FEATURE_COLS = [
     # Engineered features
     'Drug_Resistance_Count', 'Comorbidity_Count', 'Persistent_Positive_Months',
     'Bacilloscopy_Clearance_Rate', 'Disease_Severity_Score', 'Age_Risk_Category',
+    'MDR_TB', 'Persistent_Positive', 'Treatment_Failing',
 ]
 TARGET_COL = 'Target'   # 1=Low Risk (cure), 0=High Risk (death/failure)
 
@@ -60,6 +68,22 @@ TARGET_COL = 'Target'   # 1=Low Risk (cure), 0=High Risk (death/failure)
 print("Loading cleaned dataset...")
 df = pd.read_csv(DATA_PATH)
 print(f"Shape: {df.shape}")
+
+# Inject 100 Synthetic MDR-TB Failure rows
+import numpy as np
+real_failures = df[(df['MDR_TB'] == 1) & (df['Target'] == 0)]
+if not real_failures.empty:
+    print(f"Synthesizing 100 MDR-TB failures from {len(real_failures)} base cases...")
+    synth_list = []
+    for _ in range(100):
+        base = real_failures.sample(n=1).copy()
+        base['Age'] = base['Age'] + np.random.randint(-5, 6)
+        base['Age'] = base['Age'].clip(lower=1)
+        age = base['Age'].iloc[0]
+        base['Age_Risk_Category'] = 0 if age <= 14 else (1 if age <= 45 else (2 if age <= 65 else 3))
+        synth_list.append(base)
+    df = pd.concat([df] + synth_list, ignore_index=True)
+    print(f"Shape after injection: {df.shape}")
 
 X = df[FEATURE_COLS].fillna(df[FEATURE_COLS].median())
 y = df[TARGET_COL]
@@ -77,12 +101,11 @@ print(f"Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
 print(f"High-Risk in train: {(y_train==0).sum()} / {len(y_train)}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. SMOTE  (only on training set)
+# 3. SMOTE  (Removed according to fix plan)
 # ─────────────────────────────────────────────────────────────────────────────
-print("\nApplying SMOTE to training set...")
-smote = SMOTE(random_state=RANDOM_STATE)
-X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
-print(f"Post-SMOTE train size: {len(X_train_sm)} (High-Risk: {(y_train_sm==0).sum()})")
+print("\nSkipping SMOTE. Using real data with class weights.")
+X_train_sm = X_train
+y_train_sm = y_train
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. PREPROCESSING
@@ -136,7 +159,7 @@ print(f"  Best params: {rf.best_params_}")
 
 # ── XGBoost ──
 print("\nTraining XGBoost...")
-scale_pos = (y_train_sm == 1).sum() / (y_train_sm == 0).sum()
+scale_pos = (y_train_sm == 0).sum() / (y_train_sm == 1).sum()
 xgb_params = {
     'n_estimators': [100, 200],
     'max_depth': [3, 6],
@@ -160,60 +183,90 @@ results['XGBoost'] = {
 print(f"  Best params: {xgb_model.best_params_}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. EVALUATION on VALIDATION SET
+# 6. EVALUATION on VALIDATION SET + TEST SET
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n─── Validation Results ───")
 best_model_name = None
 best_recall = 0
 
 for name, res in results.items():
-    recall = recall_score(y_val, res['val_pred'], pos_label=0)
-    f1     = f1_score(y_val, res['val_pred'], pos_label=0)
+    acc    = accuracy_score(y_val, res['val_pred'])
+    prec   = precision_score(y_val, res['val_pred'], pos_label=0, zero_division=0)
+    recall = recall_score(y_val, res['val_pred'], pos_label=0, zero_division=0)
+    f1     = f1_score(y_val, res['val_pred'], pos_label=0, zero_division=0)
     auc    = roc_auc_score(y_val, res['val_proba'])
+    cm     = confusion_matrix(y_val, res['val_pred'])
     print(f"\n{name}:")
-    print(f"  Recall (High-Risk): {recall:.4f}  |  F1: {f1:.4f}  |  AUC-ROC: {auc:.4f}")
+    print(f"  Accuracy: {acc:.4f}  |  Precision: {prec:.4f}  |  Recall (High-Risk): {recall:.4f}  |  F1: {f1:.4f}  |  AUC-ROC: {auc:.4f}")
+    print(f"  Confusion Matrix:\n{cm}")
+    res['val_metrics'] = dict(accuracy=acc, precision=prec, recall=recall, f1=f1, auc=auc)
     if recall > best_recall:
         best_recall = recall
         best_model_name = name
 
 print(f"\n★  Best model by Recall: {best_model_name} ({best_recall:.4f})")
 
+# ─── Test Set Evaluation ───
+print("\n─── Test Set Results (Held-Out) ───")
+for name, res in results.items():
+    model = res['model']
+    if name == 'LogisticRegression':
+        X_test_input = X_test_lr
+    else:
+        X_test_input = X_test
+
+    test_pred  = model.predict(X_test_input)
+    test_proba = model.predict_proba(X_test_input)[:, 0]  # proba of High Risk (0)
+    acc    = accuracy_score(y_test, test_pred)
+    prec   = precision_score(y_test, test_pred, pos_label=0, zero_division=0)
+    recall = recall_score(y_test, test_pred, pos_label=0, zero_division=0)
+    f1     = f1_score(y_test, test_pred, pos_label=0, zero_division=0)
+    auc    = roc_auc_score(y_test, test_proba)
+    cm     = confusion_matrix(y_test, test_pred)
+    print(f"\n{name} [TEST]:")
+    print(f"  Accuracy: {acc:.4f}  |  Precision: {prec:.4f}  |  Recall: {recall:.4f}  |  F1: {f1:.4f}  |  AUC-ROC: {auc:.4f}")
+    print(f"  Confusion Matrix:\n{cm}")
+    res['test_metrics'] = dict(accuracy=acc, precision=prec, recall=recall, f1=f1, auc=auc)
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. SAVE METRICS TO DATABASE
+# 7. SAVE METRICS TO DATABASE  (all 3 models)
 # ─────────────────────────────────────────────────────────────────────────────
-print("\nSaving metrics to database...")
+print("\nSaving metrics for all models to database...")
+
+# Delete old auto-saved entries so there are no duplicates across retrains
+ModelMetric.objects.filter(version="1.1.0 (Auto)").delete()
+
+# Global SHAP for best model only (TreeExplainer can be slow)
+print("Calculating global SHAP values for best model...")
 best_res = results[best_model_name]
-y_val_pred = best_res['val_pred']
-y_val_proba = best_res['val_proba']
-
-# Calculate final metrics for the best model
-acc = accuracy_score(y_val, y_val_pred)
-prec = precision_score(y_val, y_val_pred, pos_label=0)
-rec = recall_score(y_val, y_val_pred, pos_label=0)
-f1 = f1_score(y_val, y_val_pred, pos_label=0)
-auc = roc_auc_score(y_val, y_val_proba)
-
-# Global SHAP calculation
-print("Calculating global SHAP values...")
 explainer = shap.TreeExplainer(best_res['model'])
-shap_vals = explainer.shap_values(X_val)
-if isinstance(shap_vals, list): # For some versions of SHAP/models
+if best_model_name == 'LogisticRegression':
+    shap_input = X_val_lr
+else:
+    shap_input = X_val
+shap_vals = explainer.shap_values(shap_input)
+if isinstance(shap_vals, list):
     shap_vals = shap_vals[0]
 global_importance = {
     col: float(np.abs(shap_vals[:, i]).mean())
     for i, col in enumerate(FEATURE_COLS)
 }
 
-ModelMetric.objects.create(
-    version="1.1.0 (Auto)",
-    model_name=best_model_name,
-    accuracy=acc,
-    precision=prec,
-    recall=rec,
-    f1_score=f1,
-    auc_roc=auc,
-    global_importance=global_importance
-)
+for name, res in results.items():
+    m = res['test_metrics']  # use test-set scores for the DB record
+    is_best = (name == best_model_name)
+    ModelMetric.objects.create(
+        version="1.1.0 (Auto)",
+        model_name=name,
+        accuracy=m['accuracy'],
+        precision=m['precision'],
+        recall=m['recall'],
+        f1_score=m['f1'],
+        auc_roc=m['auc'],
+        # Only store SHAP for best model; empty dict for others
+        global_importance=global_importance if is_best else {}
+    )
+    print(f"  Saved metrics for {name}")
 
 # Save feature column list for inference
 joblib.dump(FEATURE_COLS, MODELS_DIR / 'feature_cols.pkl')

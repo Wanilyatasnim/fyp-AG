@@ -89,13 +89,13 @@ def analyst_dashboard(request):
     """
     total_patients = Patient.objects.count()
     risk_dist = Prediction.objects.values('risk_category').annotate(count=Count('id'))
-    sex_dist = Patient.objects.values('Sex').annotate(count=Count('id'))
+    sex_dist = Patient.objects.values('Sex').annotate(count=Count('pk'))
     
     one_year_ago = timezone.now().date() - timedelta(days=365)
     trends = Patient.objects.filter(created_at__gte=one_year_ago)\
         .annotate(month=TruncMonth('created_at'))\
         .values('month')\
-        .annotate(count=Count('id'))\
+        .annotate(count=Count('pk'))\
         .order_by('month')
 
     sex_labels = {1: 'Male', 2: 'Female'} 
@@ -104,19 +104,29 @@ def analyst_dashboard(request):
         'total_patients': total_patients,
         'risk_dist_json': json.dumps({item['risk_category']: item['count'] for item in risk_dist}),
         'sex_dist_json': json.dumps({sex_labels.get(item['Sex'], 'Other'): item['count'] for item in sex_dist}),
-        'trend_labels': json.dumps([t['month'].strftime('%b %Y') for t in trends]),
-        'trend_values': json.dumps([t['count'] for t in trends]),
+        'trend_labels': json.dumps([t['month'].strftime('%b %Y') for t in trends if t['month']]),
+        'trend_values': json.dumps([t['count'] for t in trends if t['month']]),
     }
     return render(request, 'dashboard/analyst_dashboard.html', context)
 
 @login_required
 @user_passes_test(is_analyst_or_admin)
 def model_performance(request):
-    latest_metrics = ModelMetric.objects.order_by('-created_at').first()
-    importance_json = json.dumps(latest_metrics.global_importance) if latest_metrics else '{}'
+    # Get the most recent training run's version (latest created_at)
+    latest = ModelMetric.objects.order_by('-created_at').first()
+    if latest:
+        # Fetch all models from that same training run (same version)
+        all_metrics = ModelMetric.objects.filter(version=latest.version).order_by('-auc_roc')
+        best_metrics = all_metrics.first()  # highest AUC
+        importance_json = json.dumps(best_metrics.global_importance) if best_metrics and best_metrics.global_importance else '{}'
+    else:
+        all_metrics = ModelMetric.objects.none()
+        best_metrics = None
+        importance_json = '{}'
 
     context = {
-        'metrics': latest_metrics,
+        'metrics': best_metrics,           # best single model (for legacy cards)
+        'all_metrics': all_metrics,        # all 3 models for comparison table
         'importance_json': importance_json,
     }
     return render(request, 'dashboard/model_performance.html', context)
@@ -184,12 +194,20 @@ def patient_dashboard(request, patient_id):
     latest_prediction = patient.predictions.order_by('-prediction_date').first()
     shap_data_json = json.dumps(latest_prediction.shap_values) if latest_prediction and latest_prediction.shap_values else '{}'
     recommendations = get_clinical_recommendations(latest_prediction.risk_category) if latest_prediction else []
+    
+    # Fetch all monitoring visits for comparison table
+    visits = patient.visits.all().order_by('visit_month')
+    
+    # Calculate risk percentage (assuming risk_score is 0-1)
+    risk_percentage = round(latest_prediction.risk_score * 100, 1) if latest_prediction else 0
         
     context = {
         'patient': patient,
         'prediction': latest_prediction,
+        'risk_percentage': risk_percentage,
         'shap_data_json': shap_data_json,
         'recommendations': recommendations,
+        'visits': visits,
     }
     return render(request, 'dashboard/patient_dashboard.html', context)
 

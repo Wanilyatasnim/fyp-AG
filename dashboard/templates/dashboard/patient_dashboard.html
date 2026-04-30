@@ -6,20 +6,34 @@
 <style>
   .gauge-wrap { position: relative; width: 200px; margin: 0 auto; }
   .gauge-center-text { position: absolute; bottom: 15px; width: 100%; text-align: center; }
-  .shap-bar { height: 8px; border-radius: 4px; transition: width 0.6s ease; }
-  .shap-row { margin-bottom: 16px; padding: 12px; border-radius: var(--radius-md); background: var(--bg-secondary); }
+  .shap-bar { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+  
+  /* ---- Professional List Styles ---- */
+  .pro-list { display: flex; flex-direction: column; }
+  .pro-list-header { font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 0 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 8px; }
+  .pro-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 0.5px solid var(--border-light); }
+  .pro-row:last-child { border-bottom: none; }
+  .pro-label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+  .pro-label i { font-size: 16px; color: var(--text-tertiary); width: 20px; text-align: center; }
+  .pro-value { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: right; }
+  
+  /* ---- Risk Driver List Styles ---- */
+  .driver-row { display: grid; grid-template-columns: 24px 1fr 80px 100px; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border-light); }
+  .driver-row:last-child { border-bottom: none; }
+  .driver-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .driver-impact { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 </style>
 {% endblock %}
 
 {% block topbar_actions %}
-<div style="display:flex; gap:8px;">
-    <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="btn-secondary btn-sm">
-        <i class="bi bi-calendar-plus"></i> Record Visit
+<div style="display:flex; gap:12px; align-items:center;">
+    <a href="{% url 'add_monitoring_visit' patient.patient_id %}" class="btn-secondary">
+        <i class="bi bi-plus-lg"></i> Record Visit
     </a>
     <form method="post" action="{% url 'generate_prediction' patient.patient_id %}" style="margin:0;">
         {% csrf_token %}
-        <button type="submit" class="btn-primary btn-sm">
-            <i class="bi bi-cpu"></i> {% if prediction %}Update Prediction{% else %}Run Prediction{% endif %}
+        <button type="submit" class="btn-primary">
+            <i class="bi bi-cpu-fill"></i> {% if prediction %}Update Risk Model{% else %}Run Risk Analysis{% endif %}
         </button>
     </form>
 </div>
@@ -40,26 +54,26 @@
 </script>
 
 <!-- Header Identity Card -->
-<div class="card" style="padding: 20px; border-left: 4px solid var(--accent-primary);">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-        <div style="display: flex; align-items: center; gap: 16px;">
-            <div class="user-avatar" style="width: 48px; height: 48px; font-size: 18px; background: var(--bg-tertiary); color: var(--text-primary);">
+<div class="card" style="padding: 24px; border-left: 6px solid var(--accent-primary); border-top: none; border-right: none; border-bottom: none; border-radius: var(--radius-md);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 24px;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div class="user-avatar" style="width: 54px; height: 54px; font-size: 20px; background: var(--bg-tertiary); color: var(--text-primary); border-radius: 12px; font-weight: 700;">
                 {{ patient.name|slice:":1"|upper }}
             </div>
             <div>
-                <h1 style="margin: 0; font-size: 20px;">{{ patient.name }}</h1>
-                <div style="font-size: 12px; color: var(--text-tertiary);">
-                    ID: {{ patient.patient_id|upper }} &nbsp;•&nbsp; 
+                <h1 style="margin: 0; font-size: 24px; letter-spacing: -0.02em;">{{ patient.name }}</h1>
+                <div style="font-size: 13px; color: var(--text-tertiary); font-weight: 500; margin-top: 2px;">
+                    Patient ID: {{ patient.patient_id|upper|slice:":13" }}... &nbsp;•&nbsp; 
                     Registry Date: {{ patient.created_at|date:"M d, Y" }}
                 </div>
             </div>
         </div>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <span class="badge {% if patient.treatment_status == 'Active' %}badge-active{% else %}badge-default{% endif %}" style="padding: 6px 12px; font-size: 12px;">
-                {{ patient.treatment_status }}
+        <div style="display: flex; gap: 16px; align-items: center;">
+            <span class="badge {% if patient.treatment_status == 'Active' %}badge-low{% else %}badge-moderate{% endif %}" style="padding: 8px 16px; font-size: 13px;">
+                {{ patient.treatment_status }} Status
             </span>
             {% if prediction %}
-            <span class="badge badge-{{ prediction.risk_category|lower }}" style="padding: 6px 12px; font-size: 12px;">
+            <span class="badge badge-{{ prediction.risk_category|lower }}" style="padding: 8px 16px; font-size: 13px;">
                 {{ prediction.risk_category }} PTLD Risk
             </span>
             {% endif %}
@@ -71,41 +85,55 @@
     <!-- Left Column: Patient Profile -->
     <div class="col-lg-4">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header" style="margin-bottom: 0px; border-bottom: none;">
                 <h3 class="card-title">Clinical Profile</h3>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 14px;">
-                <div style="display: flex; justify-content: space-between; font-size: 13px;">
-                    <span style="color: var(--text-secondary);">Age / Sex</span>
-                    <span style="font-weight: 500;">{{ patient.Age }}y / {{ patient.get_Sex_display }}</span>
+            
+            <div class="pro-list">
+                <div class="pro-list-header">Demographics</div>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-person"></i> Age</div>
+                    <div class="pro-value">{{ patient.Age }} years</div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 13px;">
-                    <span style="color: var(--text-secondary);">HIV Status</span>
-                    <span class="badge {% if patient.HIV == 1 %}badge-high{% else %}badge-default{% endif %}">{{ patient.get_HIV_display }}</span>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-gender-ambiguous"></i> Biological Sex</div>
+                    <div class="pro-value">{{ patient.get_Sex_display }}</div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 13px;">
-                    <span style="color: var(--text-secondary);">Comorbidities</span>
-                    <span style="font-weight: 500;">
+                
+                <div class="pro-list-header" style="margin-top: 12px;">Medical Status</div>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-virus"></i> HIV / AIDS</div>
+                    <div class="pro-value">
+                        <span class="badge {% if patient.HIV == 1 %}badge-high{% else %}badge-low{% endif %}">{{ patient.get_HIV_display }}</span>
+                    </div>
+                </div>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-capsule"></i> Comorbidities</div>
+                    <div class="pro-value" style="font-weight: 700;">
                         {% if patient.Diabetes_Comorbidity == 1 %}Diabetes{% endif %}
                         {% if patient.Smoking_Comorbidity == 1 %}{% if patient.Diabetes_Comorbidity == 1 %}, {% endif %}Smoking{% endif %}
-                        {% if patient.Diabetes_Comorbidity == 0 and patient.Smoking_Comorbidity == 0 %}None Reported{% endif %}
-                    </span>
+                        {% if patient.Diabetes_Comorbidity == 0 and patient.Smoking_Comorbidity == 0 %}None{% endif %}
+                    </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 10px; border-top: 0.5px solid var(--border-light);">
-                    <span style="color: var(--text-secondary);">TB Type</span>
-                    <span style="font-weight: 500;">{{ patient.get_Clinical_Form_display }}</span>
+                
+                <div class="pro-list-header" style="margin-top: 12px;">TB Diagnostics</div>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-lungs"></i> Clinical Form</div>
+                    <div class="pro-value">{{ patient.get_Clinical_Form_display }}</div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 13px;">
-                    <span style="color: var(--text-secondary);">X-Ray Findings</span>
-                    <span style="font-weight: 500; text-align: right;">{{ patient.get_Chest_X_Ray_display }}</span>
+                <div class="pro-row">
+                    <div class="pro-label"><i class="bi bi-camera"></i> Chest X-Ray</div>
+                    <div class="pro-value">{{ patient.get_Chest_X_Ray_display }}</div>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="background-color: var(--bg-secondary); border: none;">
-            <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px;">Clinical Summary</h4>
-            <p style="font-size: 12.5px; color: var(--text-secondary);">
-                Patient is on a standard treatment regimen. Bacilloscopy monitor reflects the bacterial load over the 6-month intensive and maintenance phases.
+        <div class="card" style="background: var(--accent-soft); border-color: rgba(217,119,6,0.1);">
+            <h4 style="font-size: 14px; font-weight: 700; color: var(--accent-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i class="bi bi-info-circle-fill"></i> Clinical Context
+            </h4>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 0; line-height: 1.6;">
+                Patient monitoring involves serial bacilloscopy and physiological weight tracking. Risk model updates should be performed post-biomarker results.
             </p>
         </div>
     </div>
@@ -115,54 +143,130 @@
         <div class="row g-4">
             <!-- Risk Gauge & Recommendations -->
             <div class="col-md-5">
-                <div class="card h-100" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px;">
+                <div class="card h-100" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px;">
                     <div class="gauge-wrap">
                         <canvas id="riskGauge" width="200" height="110"></canvas>
-                        <div class="gauge-center-text">
-                            <div style="font-size: 28px; font-weight: 700;">{% if prediction %}{{ prediction.risk_score|floatformat:0 }}%{% else %}—{% endif %}</div>
-                            <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Risk Score</div>
+                        <div class="gauge-center-text" style="bottom: 10px;">
+                            <div style="font-size: 32px; font-weight: 800; color: var(--text-primary);">{% if prediction %}{{ risk_percentage }}%{% else %}—{% endif %}</div>
+                            <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-top: -4px;">Risk Score</div>
                         </div>
                     </div>
+                    {% if prediction %}
+                    <div style="margin-top: 16px; text-align: center;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--risk-{{ prediction.risk_category|lower }});">
+                            {{ prediction.risk_category }} Risk Level
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             
             <div class="col-md-7">
                 <div class="card h-100">
                     <div class="card-header">
-                        <h3 class="card-title">Recommendations</h3>
+                        <h3 class="card-title">Recommended Actions</h3>
                     </div>
                     {% if prediction %}
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
                             {% for rec in recommendations %}
-                            <div style="display: flex; gap: 10px; font-size: 13px; align-items: start;">
-                                <i class="bi bi-check-circle" style="color: var(--color-success); font-size: 14px;"></i>
-                                <span style="color: var(--text-primary); line-height: 1.4;">{{ rec }}</span>
+                            <div style="display: flex; gap: 12px; font-size: 13.5px; align-items: start;">
+                                <div style="width: 20px; height: 20px; background: var(--bg-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">
+                                    <i class="bi bi-chevron-right" style="color: var(--accent-primary); font-size: 10px; font-weight: 800;"></i>
+                                </div>
+                                <span style="color: var(--text-primary); line-height: 1.5; font-weight: 500;">{{ rec }}</span>
                             </div>
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div style="text-align: center; padding: 24px; color: var(--text-tertiary);">
-                            <i class="bi bi-robot" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
-                            Run a machine learning prediction to see tailor-made clinical actions.
+                        <div style="text-align: center; padding: 32px; color: var(--text-tertiary);">
+                            <i class="bi bi-robot" style="font-size: 28px; display: block; margin-bottom: 12px; opacity: 0.5;"></i>
+                            <p style="font-size: 14px; margin-bottom: 0;">Analyze patient data to generate <br>actionable clinical insights.</p>
                         </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- SHAP Explainability -->
+            <!-- Risk Factor Analysis (SHAP) -->
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Risk Factor Analysis (SHAP)</h3>
-                        <div style="font-size: 11px; color: var(--text-tertiary);">Explainable AI Insights</div>
+                        <div>
+                            <h3 class="card-title">Risk Driver Analysis</h3>
+                            <div style="font-size: 11px; color: var(--text-tertiary); font-weight: 500; margin-top: 2px;">Key predictors influencing the patient's risk score</div>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 4px 10px; border-radius: 4px; font-weight: 600; border: 1px solid var(--border-light);">SHAP ENGINE</div>
                     </div>
                     {% if prediction and prediction.shap_values %}
-                    <div class="row g-3" id="shapListContainer">
-                        <!-- SHAP bars injected via JS -->
+                    <div id="shapListContainer" style="display: flex; flex-direction: column;">
+                        <!-- Risk drivers injected via JS -->
                     </div>
                     {% else %}
                     <div style="padding: 40px; text-align: center; color: var(--text-tertiary);">
+                        <i class="bi bi-graph-up-arrow" style="font-size: 24px; display: block; margin-bottom: 12px; opacity: 0.4;"></i>
                         No analysis data available. Run a prediction to see feature importance.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Monitoring History (Comparison Table) -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Clinical History (Comparison)</h3>
+                        <div style="font-size: 12px; color: var(--text-tertiary); font-weight: 500;">Cumulative Monitoring Progress</div>
+                    </div>
+                    {% if visits %}
+                    <div class="table-responsive">
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Indicator</th>
+                                    {% for v in visits %}
+                                    <th style="text-align: center;">Month {{ v.visit_month }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="font-bold">Weight (kg)</td>
+                                    {% for v in visits %}
+                                    <td>{{ v.weight|default:"—" }}</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td class="font-bold">BMI</td>
+                                    {% for v in visits %}
+                                    <td>{{ v.bmi|default:"—" }}</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td class="font-bold">Bacilloscopy</td>
+                                    {% for v in visits %}
+                                    <td>
+                                        {% if v.bacilloscopy_result == 1 %}
+                                        <span class="badge badge-high">Positive</span>
+                                        {% elif v.bacilloscopy_result == 2 %}
+                                        <span class="badge badge-low">Negative</span>
+                                        {% else %}
+                                        <span class="badge" style="background:#f3f4f6; color:#6b7280;">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td class="font-bold">Visit Date</td>
+                                    {% for v in visits %}
+                                    <td class="text-xs">{{ v.visit_date|date:"d/m/y"|default:"—" }}</td>
+                                    {% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div style="padding: 32px; text-align: center; color: var(--text-tertiary);">
+                        <i class="bi bi-calendar-x" style="font-size: 28px; display: block; margin-bottom: 12px; opacity: 0.5;"></i>
+                        <p style="font-size: 14px; margin-bottom: 0;">No monitoring visits recorded yet.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -172,10 +276,10 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Bacilloscopy Trend</h3>
+                        <h3 class="card-title">Bacilloscopy Progression Chart</h3>
                     </div>
                     <div style="padding: 10px;">
-                        <canvas id="bacilloChart" height="120"></canvas>
+                        <canvas id="bacilloChart" height="100"></canvas>
                     </div>
                 </div>
             </div>
@@ -219,31 +323,105 @@
         }
     });
 
-    // 2. SHAP Bars
-    const shapData = JSON.parse(document.getElementById('shap-data').textContent);
+    // 2. Comprehensive Categorized SHAP List
+    const shapDataRaw = JSON.parse(document.getElementById('shap-data').textContent);
     const shapContainer = document.getElementById('shapListContainer');
-    if (shapContainer && shapData) {
-        const sorted = Object.entries(shapData).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
-        sorted.slice(0, 8).forEach(([feat, val]) => {
-            const col = document.createElement('div');
-            col.className = 'col-md-6';
-            const barWidth = Math.min(Math.abs(val) * 150, 100).toFixed(1);
-            const color = val >= 0 ? themeColors.high : themeColors.low;
-            const direction = val >= 0 ? 'Increase' : 'Decrease';
-            
-            col.innerHTML = `
-                <div class="shap-row">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px;">
-                        <span style="font-weight:600;">${feat.replace(/_/g, ' ')}</span>
-                        <span style="color:${color}; font-weight:500;">${direction}</span>
-                    </div>
-                    <div style="background:var(--bg-tertiary); height:6px; border-radius:3px; position:relative;">
-                        <div class="shap-bar" style="width:${barWidth}%; background:${color}; height:6px;"></div>
-                    </div>
-                </div>
-            `;
-            shapContainer.appendChild(col);
+    
+    const featureLabels = {
+        'Age': 'Patient Age',
+        'Sex': 'Biological Sex',
+        'Days_In_Treatment': 'Treatment Duration (Days)',
+        'Persistent_Positive_Months': 'Months of Positive Sputum',
+        'MDR_TB': 'MDR-TB (Drug Resistance)',
+        'AIDS_Comorbidity': 'HIV Comorbidity',
+        'HIV': 'HIV Status',
+        'Diabetes_Comorbidity': 'Diabetes History',
+        'Smoking_Comorbidity': 'Smoking History',
+        'Alcoholism_Comorbidity': 'Alcohol Intake',
+        'Chest_X_Ray': 'Initial X-Ray Status',
+        'Bacilloscopy_Sputum': 'Sputum Result (Baseline)',
+        'Disease_Severity_Score': 'Disease Severity Score',
+        'Comorbidity_Count': 'Total Comorbidities',
+        'Drug_Resistance_Count': 'Drug Resistance Count',
+        'Treatment_Failing': 'Early Treatment Failure Signal',
+        'Persistent_Positive': 'Persistent Infection Flag',
+        'Bacilloscopy_Month_1': 'Sputum Result (Month 1)',
+        'Bacilloscopy_Month_2': 'Sputum Result (Month 2)',
+        'Bacilloscopy_Month_3': 'Sputum Result (Month 3)',
+        'Bacilloscopy_Month_4': 'Sputum Result (Month 4)',
+        'Bacilloscopy_Month_5': 'Sputum Result (Month 5)',
+        'Bacilloscopy_Month_6': 'Sputum Result (Month 6)',
+        'Rifampicin': 'Rifampicin Resistance',
+        'Isoniazid': 'Isoniazid Resistance',
+        'Ethambutol': 'Ethambutol Resistance',
+        'Pyrazinamide': 'Pyrazinamide Resistance',
+        'Streptomycin': 'Streptomycin Resistance',
+        'Ethionamide': 'Ethionamide Resistance',
+        'Sputum_Culture': 'Initial Sputum Culture',
+        'Clinical_Form': 'TB Clinical Form',
+        'Clearance_Rate': 'Sputum Clearance Rate'
+    };
+
+    const categories = [
+        { name: '💊 Drug Resistance', features: ['Rifampicin', 'Isoniazid', 'MDR_TB', 'Ethambutol', 'Pyrazinamide', 'Streptomycin', 'Ethionamide', 'Other_Drugs', 'Drug_Resistance_Count'] },
+        { name: '🧪 Treatment Response', features: ['Bacilloscopy_Month_4', 'Bacilloscopy_Month_5', 'Bacilloscopy_Month_6', 'Treatment_Failing', 'Persistent_Positive', 'Persistent_Positive_Months', 'Bacilloscopy_Month_3', 'Bacilloscopy_Month_1', 'Bacilloscopy_Month_2', 'Clearance_Rate', 'Bacilloscopy_Sputum', 'Sputum_Culture'] },
+        { name: '🩺 Clinical Context', features: ['Chest_X_Ray', 'Clinical_Form', 'Disease_Severity_Score', 'Days_In_Treatment', 'Occupational_Disease'] },
+        { name: '🧬 Comorbidities', features: ['AIDS_Comorbidity', 'HIV', 'Diabetes_Comorbidity', 'Smoking_Comorbidity', 'Alcoholism_Comorbidity', 'Mental_Disorder_Comorbidity', 'Drug_Addiction_Comorbidity', 'Comorbidity_Count'] },
+        { name: '👥 Demographics', features: ['Age', 'Sex', 'Race', 'Age_Risk_Category'] }
+    ];
+
+    if (shapContainer && shapDataRaw) {
+        let hasInjectedHeader = false;
+
+        categories.forEach(cat => {
+            // Filter features in this category that have significant impact
+            const catFeatures = cat.features
+                .map(f => [f, shapDataRaw[f] || 0])
+                .filter(pair => Math.abs(pair[1]) > 0.0001); // Only show impacting features
+
+            if (catFeatures.length > 0) {
+                // Add Section Header for Category
+                const catHeader = document.createElement('div');
+                catHeader.style.padding = '20px 14px 8px';
+                catHeader.style.fontSize = '12px';
+                catHeader.style.fontWeight = '800';
+                catHeader.style.color = 'var(--accent-primary)';
+                catHeader.style.letterSpacing = '0.05em';
+                catHeader.style.textTransform = 'uppercase';
+                catHeader.style.borderBottom = '1px solid var(--border-light)';
+                catHeader.innerHTML = cat.name;
+                shapContainer.appendChild(catHeader);
+
+                catFeatures.sort((a,b) => Math.abs(b[1]) - Math.abs(a[1])).forEach(([feat, val]) => {
+                    const row = document.createElement('div');
+                    row.className = 'driver-row';
+                    row.style.paddingLeft = '14px';
+                    row.style.paddingRight = '14px';
+
+                    const barWidth = Math.min(Math.abs(val) * 150, 100).toFixed(1);
+                    const color = val >= 0 ? themeColors.high : themeColors.low;
+                    const direction = val >= 0 ? 'Increase' : 'Decrease';
+                    const icon = val >= 0 ? 'bi-arrow-up-right' : 'bi-arrow-down-right';
+                    
+                    const label = featureLabels[feat] || feat.replace(/_/g, ' ');
+                    
+                    row.innerHTML = `
+                        <div style="color:${color};"><i class="bi ${icon}"></i></div>
+                        <div class="driver-label">${label}</div>
+                        <div class="driver-impact" style="color:${color};">${direction}</div>
+                        <div style="background:var(--bg-tertiary); height:4px; border-radius:2px; position:relative;">
+                            <div class="shap-bar" style="width:${barWidth}%; background:${color}; height:4px;"></div>
+                        </div>
+                    `;
+                    shapContainer.appendChild(row);
+                });
+            }
         });
+
+        // Fallback if no impact shown
+        if (shapContainer.children.length === 0) {
+            shapContainer.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-tertiary);">No significant risk drivers identified for this profile.</div>';
+        }
     }
 
     // 3. Bacilloscopy Chart
